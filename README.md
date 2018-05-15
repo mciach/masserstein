@@ -19,6 +19,8 @@ After installing the requirements, simply download or clone this repository. On 
 git clone https://github.com/mciach/wassersteinms.git
 ```
 
+This will create a folder `wassersteinms` in your current working directory. The folder contains the programs and some example data. 
+
 # Usage
 
 This repository contains two programs: WSDist.py and WSDeconvolve.py. At this moment, both programs are commandline applications, and no graphical interface is provided. Example data for both programs is availiable in the `examples` folder.
