@@ -7,7 +7,7 @@ If you encounter any difficulties during installation or usage of these programs
 
 # Installation
 
-To be able to use the software provided in this repository, you will need to have a working Python 2.7 distribution installed on your operating system. You will also need to have the following packages installed (availiable on PIP):
+To be able to use the software provided in this repository, you will need to have a working Python 2.7 distribution installed on your computer. You will also need to have the following packages installed (availiable on PIP):
 
 * IsoSpecPy
 * Numpy
