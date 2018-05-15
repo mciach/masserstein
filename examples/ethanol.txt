@@ -1,0 +1,5 @@
+# Mass spectrum of ethanol, C2H6O1, predicted by IsoSpec
+# m/z       	relative intensity
+46.0418648138	0.978654163823
+47.045219649	0.0213458361771
+

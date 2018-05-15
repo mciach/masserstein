@@ -1,0 +1,6 @@
+# A list of molecules to deconvolve the spectrum in small_molecule_mixture.txt: ethanol, acetic acid and propane.
+# Note that after each element, a number needs to be present.
+# For example, S1N2 is the correct way to indicate one sulfur and one nitrogen, while SN2 will be interpreted as two atoms of tin.  
+C2H6O1
+C3H8
+C2H4O2
