@@ -13,13 +13,13 @@ To be able to use the software provided in this repository, you will need to hav
 * Numpy
 * Scipy
 
-After installing the requirements, simply download or clone this repository. On Ubuntu linux, this can be done by typing into the command line:
+After installing these packages, simply download or clone this repository. On Ubuntu linux, this can be done by typing into the command line:
 
 ```
 git clone https://github.com/mciach/wassersteinms.git
 ```
 
-This will create a folder `wassersteinms` in your current working directory. The folder contains the programs and some example data. 
+The above command will create a folder `wassersteinms` in your current working directory. The folder contains the programs and some example data. 
 
 # Usage
 
