@@ -31,7 +31,7 @@ The WSDist.py application allows to compute the Wasserstein distance between two
 python WSDist.py spectrum1.txt spectrum2.txt
 ```
 
-This will perform a basic normalization and denoising of the spectra and print the distance into the command line. Additional options include fine-tuning the denoising and printing the transport scheme. More details and usage examples are available in the help message of the application, which can be obtained by typing `python WSDist.py -h`. 
+This will perform a basic normalization and denoising of the spectra and print the distance into the command line. Additional options include fine-tuning the denoising procedure and printing the transport scheme. More details and usage examples are available in the help message of the application, which can be obtained by typing `python WSDist.py -h`. 
 
 The WSDeconvolve.py allows to obtain proportions of overlapping isotopic distributions of several compounds. The user needs to supply a file with a peak list of the spectrum and a file listing the elemental compositions of the molecules that are to be deconvolved. The program will automatically compute the theoretical isotopic envelopes of the supplied molecules, using the IsoSpec algorithm. The basic usage is similar to WSDeconvolve.py:
 
