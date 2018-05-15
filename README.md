@@ -39,7 +39,7 @@ The WSDeconvolve.py allows to obtain proportions of overlapping isotopic distrib
 python WSDeconvolve.py spectrum.txt molecule_list.txt
 ```
 
-This will print the program configuration, followed by a table containing the molecules and the corresponding proportions of their isotopic envelopes. 
+This will print the program configuration, followed by a table containing the molecules and the corresponding proportions of their isotopic envelopes. Typing `python WSDeconvolve.py` will print the help message with description of additional options.
 
 Note that when specifying the molecules in the molecule list, after each element a number needs to be present. For example, S1N2 is the correct way to indicate one sulfur and one nitrogen atom, while SN2 will be interpreted as two atoms of tin.  
 
