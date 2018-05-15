@@ -35,7 +35,8 @@ OPTIONS:
     -t: float
         The total intensity that is to remain in a spectrum after denoising. 
         Default: 0.99, which means that peaks corresponding to at most 0.01 of the intensity  
-        will be removed.
+        will be removed. 
+        Setting this parameter to 1 disables denoising.  
     -h
         Print this message and exit.
 """
