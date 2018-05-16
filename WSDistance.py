@@ -1,5 +1,4 @@
 from src.wasserstein import Spectrum
-from src.FastIPMDeconv2 import FastIPMDeconv
 from getopt import getopt
 import sys
 
@@ -39,6 +38,9 @@ OPTIONS:
         Setting this parameter to 1 disables denoising.  
     -h
         Print this message and exit.
+        
+CONTACT:
+    If you encounter any problems during use of this application, please email me at m_ciach@student.uw.edu.pl.
 """
 
 thr = 0.99

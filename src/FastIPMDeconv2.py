@@ -140,8 +140,8 @@ def FastIPMDeconv(emp_spectrum, thr_spectrums, eps=1e-6, max_iter=100):
         
         
         if (r_p_rel < eps ) and (r_d_rel < eps) and (mu * (2*n + m) < eps):
-            print("Termination condition true")
-            print("Total iterations : " +str(step))
+            print "Termination condition reached successfully."
+            print "Total iterations : " +str(step)
             #print(x)
             #print(s)
             #print(y)
@@ -204,22 +204,23 @@ def FastIPMDeconv(emp_spectrum, thr_spectrums, eps=1e-6, max_iter=100):
         s = np.maximum(s, 1e-20 * np.ones(2*n + m))
     
     if step == (max_iter - 1):
-        print("Maximum amount of iterations reached.")
+        print "WARNING: Maximum amount of iterations reached before the termination condition was met."
         #print(x)
         #print(s)
         #print(y)
     if NUM_ALG_ERR:
-        print("There was a numerical algebra error")
-        print("Error in step ", step)
-        print(r_p_norm, r_p_rel, r_d_norm, r_d_rel, mu * (2*n + m))
+        print "WARNING: Numerical algebra error encountered"
+        print "Error in step", step
+        print r_p_norm, r_p_rel, r_d_norm, r_d_rel, mu * (2*n + m)
+        return None
 
 
     fun_val = np.zeros(n)
     A_right_mult(masses_on_index, y[0:m], m, n, fun_val)
     a_vals = abs(fun_val - c[0:n]) 
     
-    end_time = time.time()
-    print("Time: ", end_time - start_time)
+    # end_time = time.time()
+    # print("Time: ", end_time - start_time)
 
     return {'weights':y[0:m], 'fun': - sum(a_vals[0:(n-1)] * b[m:m+n-1]), 
             'NUM_ALG_ERR' : NUM_ALG_ERR, 'steps' : step+1}
