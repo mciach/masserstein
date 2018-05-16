@@ -94,6 +94,7 @@ print "Experimental spectrum:", args[0]
 print "Molecule list:", args[1]
 print "Fraction of remaining intensity after denoising:", thr
 print "Theoretical envelope coverage:", prob
+print 
 
 # parse spectrum
 sp = open(args[0]).readlines()
