@@ -1,4 +1,3 @@
-from __future__ import division
 import math
 from IsoSpecPy import IsoSpecPy
 #from Users.wandaniemyska.Documents.PROGRAMY.Wassetrstein.IsoSpec.IsoSpecPy.IsoSpecPy import IsoSpecPy
@@ -25,7 +24,7 @@ class Spectrum:
 
         if not empty:
             masses, lprobs, _unused = IsoSpecPy.IsoSpec.IsoFromFormula(formula = formula, cutoff = threshold, method = "threshold_relative").getConfs()
-            probs = map(exp, lprobs)
+            probs = list(map(exp, lprobs))
             self.confs = [(x[0]/charge, intensity*x[1]) for x in zip(masses, probs)]
             self.sort_confs()
 
@@ -33,7 +32,7 @@ class Spectrum:
     def new_random(domain = (0.0, 1.0), peaks = 10):
         ret = Spectrum("", 0.0, empty = True)
         ret.confs = []
-        for _ in xrange(peaks):
+        for _ in range(peaks):
             ret.confs.append((random.uniform(*domain), random.uniform(0.0, 1.0)))
         ret.sort_confs()
         ret.normalize()
@@ -80,7 +79,7 @@ class Spectrum:
     @staticmethod
     def ScalarProduct(spectra, weights):
         ret = Spectrum("", 0.0, empty = True)
-        Q = [(spectra[i].confs[0], i) for i in xrange(len(spectra))]
+        Q = [(spectra[i].confs[0], i) for i in range(len(spectra))]
         P = [0] * len(spectra)
         heapq.heapify(Q)
         while Q != []:
@@ -118,7 +117,7 @@ class Spectrum:
     
     def explained_intensity(self,other):
         e = 0
-        for i in xrange(len(self.confs)):
+        for i in range(len(self.confs)):
             e += min(self.confs[i][1],other.confs[i][1])
         return e
 
@@ -130,7 +129,7 @@ class Spectrum:
             output = []
             for mz,prob in self.confs:
                 first_bin_start = precision*np.round(mz/precision) - (i+0.5)*precision
-                for k in xrange(2*i+1):
+                for k in range(2*i+1):
                     current_bin_start = first_bin_start + k*precision
                     mass = (kernel_cdf(current_bin_start + precision - mz) - kernel_cdf(current_bin_start - mz))*prob
                     output.append((current_bin_start + 0.5*precision, mass))
@@ -146,7 +145,7 @@ class Spectrum:
         if scale == 0: move = [m]*n
         else: move = norm.rvs(m, scale, n)
         output = []
-        for i in xrange(n):
+        for i in range(n):
             output.append((self.confs[i][0] + move[i], self.confs[i][1]))
         self.confs = output
 
@@ -160,12 +159,12 @@ class Spectrum:
     # return removed total intensity (as a fraction of total intensity)
         s = sum([x[1] for x in self.confs])
         n = int(part*len(self.confs))
-        to_remove = sorted(random.sample(xrange(len(self.confs)),n))
+        to_remove = sorted(random.sample(range(len(self.confs)),n))
         to_remove.append(len(self.confs)+1)
         s_removed = 0
         output = []
         j = 0
-        for i in xrange(len(self.confs)):
+        for i in range(len(self.confs)):
             if to_remove[j] == i:
                 if (s_removed + self.confs[i][1])/s <= part: s_removed += self.confs[i][1]
                 else: output.append(self.confs[i])
@@ -224,7 +223,7 @@ def random_formula(mass):
             wylosowane[c] += 1
             wmass += masy[c]
         else:
-            worek = list(filter(lambda a: a != c, worek))
+            worek = list([a for a in worek if a != c])
 
     formula = ""
     kolejne = ["C","O","H","N","S"]
@@ -252,7 +251,7 @@ if __name__=="__main__":
 
 
     C.normalize()
-    for i in xrange(11):
+    for i in range(11):
         A = Spectrum(a, 0.001, 10.0-i)
         B = Spectrum(b, 0.001, float(i))
         S = A+B
@@ -269,4 +268,3 @@ if __name__=="__main__":
 
 
     from scipy.optimize import linprog
-

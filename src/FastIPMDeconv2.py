@@ -5,7 +5,7 @@ Created on Sun Apr 22 20:29:34 2018
 @author: Szymon Majewski
 """
 
-from __future__ import division
+
 import numpy as np
 import math
 import time
@@ -140,8 +140,8 @@ def FastIPMDeconv(emp_spectrum, thr_spectrums, eps=1e-6, max_iter=100):
         
         
         if (r_p_rel < eps ) and (r_d_rel < eps) and (mu * (2*n + m) < eps):
-            print "Termination condition reached successfully."
-            print "Total iterations : " +str(step)
+            print("Termination condition reached successfully.")
+            print("Total iterations : " +str(step))
             #print(x)
             #print(s)
             #print(y)
@@ -204,14 +204,14 @@ def FastIPMDeconv(emp_spectrum, thr_spectrums, eps=1e-6, max_iter=100):
         s = np.maximum(s, 1e-20 * np.ones(2*n + m))
     
     if step == (max_iter - 1):
-        print "WARNING: Maximum amount of iterations reached before the termination condition was met."
+        print("WARNING: Maximum amount of iterations reached before the termination condition was met.")
         #print(x)
         #print(s)
         #print(y)
     if NUM_ALG_ERR:
-        print "WARNING: Numerical algebra error encountered"
-        print "Error in step", step
-        print r_p_norm, r_p_rel, r_d_norm, r_d_rel, mu * (2*n + m)
+        print("WARNING: Numerical algebra error encountered")
+        print("Error in step", step)
+        print(r_p_norm, r_p_rel, r_d_norm, r_d_rel, mu * (2*n + m))
         return None
 
 
@@ -402,15 +402,15 @@ def SolveNewtonEq(masses_on_index, thr_indeces, r_p, r_d, mu, gamma,
         Adx = np.zeros(n+m-1)
         A_tilde_left_mult(thr_indeces, dx, m, n, Adx)
         print("TSNEQ")
-        print(np.linalg.norm(Adx - r_p))
+        print((np.linalg.norm(Adx - r_p)))
             
         Ady = np.zeros(2 * n + m)
         r_test = np.zeros(n + m -1)
         A_tilde_right_mult(masses_on_index, dy, m, n, Ady)
-        print(np.linalg.norm(Ady + ds - r_d))
+        print((np.linalg.norm(Ady + ds - r_d)))
         Ady = (Ady *x )/ s
         A_tilde_left_mult(thr_indeces, Ady, m, n, r_test)
-        print (np.linalg.norm(r_test - r))
+        print((np.linalg.norm(r_test - r)))
             
         #print(dx * s + ds * x + x*s)
         #print(gamma * mu)
@@ -436,11 +436,11 @@ def SolveNewtonEq(masses_on_index, thr_indeces, r_p, r_d, mu, gamma,
             G = np.diag(g)
             M = np.transpose(A_tilde).dot(G).dot(A_tilde)
             dy_prim = np.linalg.solve(M, r)
-            print(np.linalg.norm(dy_prim - dy))
-            print(sum(abs(dy_prim - dy) > 1e-06))
-            print(np.linalg.norm(x[(2*n):(2*n + m)]))
-            print(np.linalg.norm(M.dot(dy_prim) - r))
-            print(np.linalg.norm(M.dot(dy) - r))
+            print((np.linalg.norm(dy_prim - dy)))
+            print((sum(abs(dy_prim - dy) > 1e-06)))
+            print((np.linalg.norm(x[(2*n):(2*n + m)])))
+            print((np.linalg.norm(M.dot(dy_prim) - r)))
+            print((np.linalg.norm(M.dot(dy) - r)))
             pass
     
     return (dx, dy, ds)
@@ -501,7 +501,7 @@ def TestProcedures(emp_spectrum, thr_spectrums):
     
     
     # Test subroutines
-    print(n, m)
+    print((n, m))
     A = np.zeros((n, m))
     cmass = masses[0][0]
     row = 0
@@ -516,17 +516,17 @@ def TestProcedures(emp_spectrum, thr_spectrums):
     v = np.random.rand(n)
     w = np.random.rand(m)
     A_left_mult(thr_indeces, v, m, n, w)
-    print(np.transpose(v).dot(A) - np.transpose(w))
+    print((np.transpose(v).dot(A) - np.transpose(w)))
     v = np.random.rand(m, 1)
     w = np.random.rand(n, 1)
     A_right_mult(masses_on_index, v, m, n , w)
     diff = (w - A.dot(v))
-    print(np.sqrt(np.sum(diff * diff)))
+    print((np.sqrt(np.sum(diff * diff))))
     mat = np.zeros((m,m))
     h = np.random.rand(n)
     prod = np.transpose(A).dot(np.diag(h)).dot(A)
     A_trans_diag_A(thr_indeces, h, m, n, mat)
-    print(prod - mat)
+    print((prod - mat))
         
     A_tilde = np.zeros((2*n, m+n-1))
     A_tilde[0:n, 0:m] = A
@@ -538,8 +538,8 @@ def TestProcedures(emp_spectrum, thr_spectrums):
     x_rand = np.zeros(2*n)
     y_rand = np.random.rand(n + m - 1)
     A_tilde_right_mult(masses_on_index, y_rand, m, n, x_rand)
-    print(A_tilde.dot(y_rand) - x_rand)
+    print((A_tilde.dot(y_rand) - x_rand))
         
     x_rand = np.random.rand(2*n)
     A_tilde_left_mult(thr_indeces, x_rand, m, n, y_rand)
-    print(np.transpose(A_tilde).dot(x_rand) - y_rand)
+    print((np.transpose(A_tilde).dot(x_rand) - y_rand))

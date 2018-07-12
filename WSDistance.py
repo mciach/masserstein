@@ -1,5 +1,6 @@
 from src.wasserstein import Spectrum
 from getopt import getopt
+from functools import reduce
 import sys
 
 doc="""NAME:
@@ -49,7 +50,7 @@ print_transport = False
 
 opts, args = getopt(sys.argv[1:], 'hst:')
 if not args:
-    print doc
+    print(doc)
     quit()
 
 for opt, arg in opts:
@@ -58,16 +59,16 @@ for opt, arg in opts:
         if not 0 <= thr <= 1:
             raise ValueError("Improper threshold value: %f" % thr)
     if opt == '-h':
-        print doc
+        print(doc)
         quit()
     if opt == '-s':
         print_transport = True
 
 sp1, sp2 = args
 
-print "Spectrum 1:", sp1
-print "Spectrum 2:", sp2
-print "Intensity cutoff:", thr
+print("Spectrum 1:", sp1)
+print("Spectrum 2:", sp2)
+print("Intensity cutoff:", thr)
 
 sp1 = open(sp1).readlines()
 sp2 = open(sp2).readlines()
@@ -75,8 +76,8 @@ sp2 = open(sp2).readlines()
 sp1 = [l.strip() for l in sp1]
 sp2 = [l.strip() for l in sp2]
 
-sp1 = [map(float, l.split()) for l in sp1 if l and l[0] != '#']
-sp2 = [map(float, l.split()) for l in sp2 if l and l[0] != '#']
+sp1 = [list(map(float, l.split())) for l in sp1 if l and l[0] != '#']
+sp2 = [list(map(float, l.split())) for l in sp2 if l and l[0] != '#']
 
 if norm:
     sum1 = sum(l[1] for l in sp1)
@@ -104,14 +105,13 @@ Spectrum2.normalize()
 
 W = Spectrum1.WSDistance(Spectrum2)
 
-print
-print "Wasserstein distance:"
-print W
+print()
+print("Wasserstein distance:")
+print(W)
 
 if print_transport:
     mvs = list(Spectrum1.WSDistanceMoves(Spectrum2))
-    print "Optimal transport scheme:"
+    print("Optimal transport scheme:")
     for m in mvs:
         if m[2] > 1e-6:
-            print '\t'.join(map(str, m))
-
+            print('\t'.join(map(str, m)))

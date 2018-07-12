@@ -70,12 +70,12 @@ print_transport = False
 opts, args = getopt(sys.argv[1:], 'ht:m:p:e:s')
 
 if not args:
-    print doc
+    print(doc)
     quit()
 
 for opt, arg in opts:
     if opt == '-h':
-        print doc
+        print(doc)
         quit()
     if opt == '-m':
         max_iter = int(arg)
@@ -90,16 +90,16 @@ for opt, arg in opts:
     if opt == '-e':
         epsilon = float(arg)
 
-print "Experimental spectrum:", args[0]
-print "Molecule list:", args[1]
-print "Fraction of remaining intensity after denoising:", thr
-print "Theoretical envelope coverage:", prob
-print 
+print(("Experimental spectrum:", args[0]))
+print(("Molecule list:", args[1]))
+print(("Fraction of remaining intensity after denoising:", thr))
+print(("Theoretical envelope coverage:", prob))
+print() 
 
 # parse spectrum
 sp = open(args[0]).readlines()
-sp = map(str.strip, sp)
-sp = [map(float, l.split()) for l in sp if l and l[0] != '#']
+sp = list(map(str.strip, sp))
+sp = [list(map(float, l.split())) for l in sp if l and l[0] != '#']
 
 # pre-denoising normalization
 ic_total = sum(l[1] for l in sp)
@@ -121,7 +121,7 @@ spctr.normalize()
 
 # parse molecule list & construct spectral list
 molecules = open(args[1]).readlines()
-molecules = map(str.strip, molecules)
+molecules = list(map(str.strip, molecules))
 molecules = [m for m in molecules if m and m[0] != '#']  # needs to be 1-prob
 thr_spctrs = [Spectrum(m, 1-prob, 1) for m in molecules]
 
@@ -136,20 +136,20 @@ if deconv:
     mvs = [mv for mv in spctr.WSDistanceMoves(res_spctr) if mv[2] > 1e-06]
     max_mv = max(mvs, key=lambda x: abs(x[1]-x[0]))
     if abs(max_mv[1]-max_mv[0]) > 10:
-        print mass_warning % (max_mv[0], max_mv[1])
+        print((mass_warning % (max_mv[0], max_mv[1])))
 
-    print
-    print "Optimal Wasserstein distance:"
-    print deconv['fun']
-    print "Isotopic envelope proportions:"
+    print()
+    print("Optimal Wasserstein distance:")
+    print((deconv['fun']))
+    print("Isotopic envelope proportions:")
     for m, d in zip(molecules, deconv['weights']):
-        print m + '\t' + str(round(d, 10))
+        print((m + '\t' + str(round(d, 10))))
 
     if print_transport:
-        print "Optimal transport scheme:"
+        print("Optimal transport scheme:")
         for m in mvs:
             if m[2] > 1e-6:
-                print '\t'.join([str(round(m[0], 4)), str(round(m[1], 4)), str(round(m[2], 8))])
+                print(('\t'.join([str(round(m[0], 4)), str(round(m[1], 4)), str(round(m[2], 8))])))
 
 else:
-    print "Deconvolution failed. Try tweaking the program parameters or the input data."
+    print("Deconvolution failed. Try tweaking the program parameters or the input data.")
