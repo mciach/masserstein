@@ -45,4 +45,4 @@ Note that when specifying the molecules in the molecule list, after each element
 
 # Acknowledgements
 
-We thank Youzhong Liou for porting the code to Python 3.
+We thank Youzhong Liu for porting the code to Python 3.
