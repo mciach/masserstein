@@ -1,6 +1,6 @@
 # Wasserstein MS
 This repository contains software tools which allow to:
-1. Compare two spectra using the Wasserstein distance (WSDist.py),
+1. Compare two spectra using the Wasserstein distance (WSDistance.py),
 2. Deconvolve a spectrum to obtain proportions of overlapping isotopic distributions (WSDeconvolve.py).
 
 If you encounter any difficulties during installation or usage of these programs, or if you have any suggestions regarding their functionality, please send an email to m_ciach@student.uw.edu.pl. 
