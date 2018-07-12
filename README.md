@@ -28,7 +28,7 @@ This repository contains two programs: WSDist.py and WSDeconvolve.py. At this mo
 The WSDist.py application allows to compute the Wasserstein distance between two spectra. Intuitively, the Wasserstein distance is the total distance that the ion current needs to travel from one spectrum into the other. The spectra need to be supplied as peak lists in text files. The basic usage is as follows:
 
 ```
-python WSDist.py spectrum1.txt spectrum2.txt
+python WSDistance.py spectrum1.txt spectrum2.txt
 ```
 
 This will perform a basic normalization and denoising of the spectra and print the distance into the command line. Additional options include fine-tuning the denoising procedure and printing the transport scheme. More details and usage examples are available in the help message of the application, which can be obtained by typing `python WSDist.py -h`. 
