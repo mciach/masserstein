@@ -1,6 +1,6 @@
 # Wasserstein MS
 This repository contains software tools which allow to:
-1. Compare two spectra using the Wasserstein distance (WSDist.py),
+1. Compare two spectra using the Wasserstein distance (WSDistance.py),
 2. Deconvolve a spectrum to obtain proportions of overlapping isotopic distributions (WSDeconvolve.py).
 
 If you encounter any difficulties during installation or usage of these programs, or if you have any suggestions regarding their functionality, please send an email to m_ciach@student.uw.edu.pl. 
@@ -28,7 +28,7 @@ This repository contains two programs: WSDist.py and WSDeconvolve.py. At this mo
 The WSDist.py application allows to compute the Wasserstein distance between two spectra. Intuitively, the Wasserstein distance is the total distance that the ion current needs to travel from one spectrum into the other. The spectra need to be supplied as peak lists in text files. The basic usage is as follows:
 
 ```
-python WSDist.py spectrum1.txt spectrum2.txt
+python WSDistance.py spectrum1.txt spectrum2.txt
 ```
 
 This will perform a basic normalization and denoising of the spectra and print the distance into the command line. Additional options include fine-tuning the denoising procedure and printing the transport scheme. More details and usage examples are available in the help message of the application, which can be obtained by typing `python WSDist.py -h`. 
@@ -43,3 +43,6 @@ This will print the program configuration, followed by a table containing the mo
 
 Note that when specifying the molecules in the molecule list, after each element a number needs to be present. For example, S1N2 is the correct way to indicate one sulfur and one nitrogen atom, while SN2 will be interpreted as two atoms of tin.  
 
+# Acknowledgements
+
+We thank Youzhong Liu for porting the code to Python 3.
