@@ -43,3 +43,6 @@ This will print the program configuration, followed by a table containing the mo
 
 Note that when specifying the molecules in the molecule list, after each element a number needs to be present. For example, S1N2 is the correct way to indicate one sulfur and one nitrogen atom, while SN2 will be interpreted as two atoms of tin.  
 
+# Acknowledgements
+
+We thank Youzhong Liou for porting the code to Python 3.
