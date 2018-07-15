@@ -1,7 +1,10 @@
+#! /usr/bin/python
+from __future__ import print_function
 from src.wasserstein import Spectrum
 from src.FastIPMDeconv2 import FastIPMDeconv
 from getopt import getopt
 import sys
+
 
 doc = """NAME:
     WSDeconv.py
@@ -90,10 +93,10 @@ for opt, arg in opts:
     if opt == '-e':
         epsilon = float(arg)
 
-print(("Experimental spectrum:", args[0]))
-print(("Molecule list:", args[1]))
-print(("Fraction of remaining intensity after denoising:", thr))
-print(("Theoretical envelope coverage:", prob))
+print("Experimental spectrum:", args[0])
+print("Molecule list:", args[1])
+print("Fraction of remaining intensity after denoising:", thr)
+print("Theoretical envelope coverage:", prob)
 print() 
 
 # parse spectrum
@@ -140,7 +143,7 @@ if deconv:
 
     print()
     print("Optimal Wasserstein distance:")
-    print((deconv['fun']))
+    print(deconv['fun'])
     print("Isotopic envelope proportions:")
     for m, d in zip(molecules, deconv['weights']):
         print((m + '\t' + str(round(d, 10))))

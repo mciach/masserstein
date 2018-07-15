@@ -1,7 +1,10 @@
+#! /usr/bin/python
+from __future__ import print_function
 from src.wasserstein import Spectrum
 from getopt import getopt
 from functools import reduce
 import sys
+
 
 doc="""NAME:
     WSDistance.py
