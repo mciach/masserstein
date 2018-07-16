@@ -3,6 +3,7 @@ from __future__ import print_function
 from src.wasserstein import Spectrum
 from src.FastIPMDeconv2 import FastIPMDeconv
 from getopt import getopt
+from functools import reduce
 import sys
 
 
@@ -127,6 +128,8 @@ molecules = open(args[1]).readlines()
 molecules = list(map(str.strip, molecules))
 molecules = [m for m in molecules if m and m[0] != '#']  # needs to be 1-prob
 thr_spctrs = [Spectrum(m, 1-prob, 1) for m in molecules]
+for s in thr_spctrs:
+    s.normalize()
 
 deconv = FastIPMDeconv(spctr, thr_spctrs, eps=epsilon, max_iter=max_iter)
 
