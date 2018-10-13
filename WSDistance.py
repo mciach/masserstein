@@ -3,6 +3,7 @@ from __future__ import print_function
 from src.wasserstein import Spectrum
 from getopt import getopt
 from functools import reduce
+import numpy as np
 import sys
 
 
@@ -90,12 +91,12 @@ if norm:
 
 if thr < 1:
     order1 = sorted([x for x in enumerate((l[1] for l in sp1))], key=lambda y: y[1])  # ordering of intensities
-    cmsm1 = reduce(lambda x,y: x + [x[-1] + y], (l[1] for l in order1), [0])[1:]  # cumsum of ordered intensities
+    cmsm1 = np.cumsum(order1)  # cumsum of ordered intensities
     to_remove1 = [o[0] for o, c in zip(order1, cmsm1) if c < 1-thr]  # indices of peaks below threshold
     sp1 = [l for i, l in enumerate(sp1) if i not in to_remove1]  # denoised spectrum
 
     order2 = sorted([x for x in enumerate((l[1] for l in sp2))], key=lambda y: y[1])
-    cmsm2 = reduce(lambda x, y: x + [x[-1] + y], (l[1] for l in order2), [0])[1:]
+    cmsm2 = np.cumsum(order2)
     to_remove2 = [o[0] for o, c in zip(order2, cmsm2) if c < 1-thr]
     sp2 = [l for i, l in enumerate(sp2) if i not in to_remove2]
 
