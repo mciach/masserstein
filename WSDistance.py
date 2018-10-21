@@ -92,12 +92,12 @@ if norm:
 if thr < 1:
     order1 = sorted([x for x in enumerate((l[1] for l in sp1))], key=lambda y: y[1])  # ordering of intensities
     cmsm1 = np.cumsum([x[1] for x in order1])  # cumsum of ordered intensities
-    to_remove1 = [o[0] for o, c in zip(order1, cmsm1) if c < 1-thr]  # indices of peaks below threshold
+    to_remove1 = set([o[0] for o, c in zip(order1, cmsm1) if c < 1-thr])  # indices of peaks below threshold
     sp1 = [l for i, l in enumerate(sp1) if i not in to_remove1]  # denoised spectrum
 
     order2 = sorted([x for x in enumerate((l[1] for l in sp2))], key=lambda y: y[1])
     cmsm2 = np.cumsum(order2)
-    to_remove2 = [o[0] for o, c in zip(order2, cmsm2) if c < 1-thr]
+    to_remove2 = set([o[0] for o, c in zip(order2, cmsm2) if c < 1-thr])
     sp2 = [l for i, l in enumerate(sp2) if i not in to_remove2]
 
 Spectrum1 = Spectrum("", empty=True)

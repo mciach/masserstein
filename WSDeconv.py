@@ -114,7 +114,7 @@ sp = [(l[0], l[1]/ic_total) for l in sp]
 if thr < 1:
     order1 = sorted([x for x in enumerate((l[1] for l in sp))], key=lambda y: y[1])  # ordering of intensities
     cmsm1 = np.cumsum([x[1] for x in order1]) # cumsum of ordered intensities
-    to_remove1 = [o[0] for o, c in zip(order1, cmsm1) if c < 1-thr]  # indices of peaks below threshold
+    to_remove1 = set([o[0] for o, c in zip(order1, cmsm1) if c < 1-thr])  # indices of peaks below threshold
     sp = [l for i, l in enumerate(sp) if i not in to_remove1]  # denoised spectrum
 
 # construct spectrum
