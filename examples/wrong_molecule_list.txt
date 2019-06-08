@@ -1,6 +1,0 @@
-# An incomplete list of molecules from spectrum in small_molecule_mixture.txt: ethanol and propane.
-# This example is intended to show the problems occuring when the experimental spectrum contains unexpected molecules,
-# and to give an example of warning issued by the application in such situations.
-C2H6O1
-C3H8
-
