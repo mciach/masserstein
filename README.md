@@ -26,7 +26,7 @@ The above command will create a folder `wassersteinms` in your current working d
 python3 setup.py install --user
 ```
 
-This will install the `masserstein` package for the current user, as well as create the files `WSDistance` and `WSDeconv` in the current directory.
+This will install the `masserstein` package for the current user, as well as the applications `WSDistance` and `WSDeconv`. 
 
 
 # Commandline usage
@@ -39,12 +39,6 @@ The basic usage of the application is as follows:
 
 ```
 WSDistance spectrum1.txt spectrum2.txt
-```
-
-or, e.g. if a virtual environment is used,
-
-```
-python3 WSDistance spectrum1.txt spectrum2.txt
 ```
 
 This will perform a basic normalization and denoising of both spectra and print the distance to the command line. Additional options include fine-tuning the denoising procedure and printing the optimal signal transport scheme. More details and usage examples are available in the help message of the application, which can be obtained by typing `python WSDist.py -h`. This application does not support the transport distance limit ('the vortex'). 
@@ -62,7 +56,7 @@ If `[OPTIONS]` and `[OUTPUT_FILENAME]` are ommited, this will print the program 
 More details, such as options to fine-tune the program and save the detailed results in a file, are described in the help message obtainable by running  `WSDeconvolve`. The help message also shows several example runs, such as
 
 ```
-python3 WSDeconv examples/protein_spectrum.txt examples/protein_molecule_list.txt Proteins_example
+WSDeconv examples/protein_spectrum.txt examples/protein_molecule_list.txt Proteins_example
 ``` 
 
 # Programmatic usage
