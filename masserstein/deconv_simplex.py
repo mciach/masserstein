@@ -28,87 +28,6 @@ def intensity_generator(confs, mzaxis):
                 cm = next(mzaxis)
         confs.pop()  # ten pop nie dziala
 
-def dualdeconv2_legacy2(exp_sp, thr_sps, penalty, quiet=False):
-    """
-    Different formulation, maybe faster
-    exp_sp: experimental spectrum
-    thr_sp: list of theoretical spectra
-    penalty: denoising penalty
-    """
-    start = time()
-    exp_confs = exp_sp.confs.copy()
-    thr_confs = [thr_sp.confs.copy() for thr_sp in thr_sps]
-    # Normalization check:
-    assert np.isclose(sum(x[1] for x in exp_confs) , 1), 'Experimental spectrum not normalized'
-    for i, thrcnf in enumerate(thr_confs):
-        assert np.isclose(sum(x[1] for x in thrcnf), 1), 'Theoretical spectrum %i not normalized' % i
-    global_mass_axis = set(x[0] for x in exp_confs)
-    global_mass_axis.update(x[0] for s in thr_confs for x in s)
-    global_mass_axis = sorted(global_mass_axis)
-    if not quiet:
-        print("Global mass axis computed")
-    n = len(global_mass_axis)
-    k = len(thr_confs)
-    
-    bounds = [snext - scur for scur, snext in zip(global_mass_axis[:-1], global_mass_axis[1:])]
-    if not quiet:
-        print("Variable bounds computed")
-    # linear program:
-    program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
-    if not quiet:
-        print("Linear program initialized")
-    # variables:
-    lpVars = []
-    for i in range(n-1):
-        lpVars.append(lp.LpVariable('W%i' % (i+1), None, penalty, lp.LpContinuous))
-##        # in case one would like to explicitly forbid non-experimental abyss:
-##        if V[i] > 0:
-##            lpVars.append(lp.LpVariable('W%i' % (i+1), None, penalty, lp.LpContinuous))
-##        else:
-##            lpVars.append(lp.LpVariable('W%i' % (i+1), None, None, lp.LpContinuous))
-    Yg = lp.LpVariable('Yg', 0, penalty)
-##    # in case one would like to explicitly forbid non-experimental abyss:
-##    if V[-1] > 0:
-##        Yg = lp.LpVariable('Yg', 0, penalty)
-##    else:
-##        Yg = lp.lpVariable('Yg', 0, None)
-    Yp = lp.LpVariable('Yp', 0, None)
-    lpVars.append(Yg)
-    if not quiet:
-        print("Variables created")
-    # objective function:
-    exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-    program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars)) - Yp, 'Dual objective'
-    # constraints:
-    for j in range(k):
-        thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars) if v > 0.) - Yp <= 0, 'P%i' % (j+1)
-    if not quiet:
-        print('tsk tsk')
-    for i in range(n-2):
-        program += lpVars[i]-lpVars[i+1] <= bounds[i], 'EpsPlus %i' % (i+1)
-        program += lpVars[i] - lpVars[i+1] >=  -bounds[i], 'EpsMinus %i' % (i+1)
-    program += lpVars[-2] - Yg <= bounds[-1], 'EpsPlus %i' % (n-1)
-    program += lpVars[-2] - Yg >= -bounds[-1], 'EpsMinus %i' % (n-1)
-    if not quiet:
-        print("Constraints written")
-    program.writeLP('WassersteinL1.lp')
-    if not quiet:
-        print("Starting solver")
-    program.solve()
-    end = time()
-    if not quiet:
-        print("Solver finished.")
-        print("Status:", lp.LpStatus[program.status])
-        print("Optimal value:", lp.value(program.objective))
-        print("Time:", end - start)
-    constraints = program.constraints
-    probs = [round(constraints['P%i' % i].pi, 12) for i in range(1, k+1)]
-    exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
-    abyss = [round(x.dj, 12) for i, x in enumerate(lpVars) if exp_vec[i] > 0.]
-    assert np.isclose(sum(probs)+sum(abyss), 1.), 'Deconvolution error: improper proportions of signal and noise. Please report this to the authors.'
-    return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective)}
-
 
 def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
     """
@@ -336,30 +255,7 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=Fal
                 proportions[original_thr_spectrum_ID] = p*chunk_TICs[current_chunk_ID]
             for i, p in enumerate(dec['trash']):
                 original_conf_id = conf_IDs[i]
-                vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
-
-## Nieudana proba dekonwolucji wieloprocesowej:
-##            chunk_exp_spectra.append(chunkSp)
-##            chunk_thr_spectra.append(thrSp)
-##            chunk_thr_spectra_IDs.append(theoretical_spectra_IDs)
-##
-##    # Preparing jobs:
-##    jobs = mpr.Queue()
-##    results = mpr.Queue()
-##    for e, t in zip(chunk_exp_spectra, chunk_thr_spectra):
-##        jobs.put((e, t))
-##    def decon_worker(jobs, results, penalty):
-##        exp, thr = jobs.get()
-##        res = dualdeconv2(exp, thr, penalty)
-##        results.put(res)
-##        
-##    # Parallel deconvolution:
-##    workers = [mpr.Process(target = decon_worker, args=(jobs, results, MTD)) for _ in range(max_threads)]
-##    for w in workers:
-##        w.start()
-##    for w in workers:
-##        w.join()
-##        
+                vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]       
 
     assert np.isclose(sum(proportions) + sum(vortex), 1.), 'Improper proportions of signal and noise. Please report this to the authors.'
     return {'proportions': proportions, 'noise': vortex}
