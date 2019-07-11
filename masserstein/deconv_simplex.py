@@ -181,7 +181,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
     abyss = [round(x.dj, 12) for i, x in enumerate(lpVars) if exp_vec[i] > 0.]
     # note: accounting for number of summands in checking of result correctness,
     # because summation of many small numbers introduces numerical errors
-    assert np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-06), 'Deconvolution error: improper proportions of signal and noise. Please report this to the authors.'
+    assert np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03), 'Deconvolution error: improper proportions of signal and noise. Please report this to the authors.'
     return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective)}
 
 

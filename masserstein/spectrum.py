@@ -12,6 +12,7 @@ import re
 from collections import Counter
 import numpy.random as rd
 from scipy.ndimage import gaussian_filter
+from copy import deepcopy
 
 try:
     xrange
@@ -25,6 +26,8 @@ class Spectrum:
         ### albo przez formule albo przez liste confs. 
         self.label = label
         self.confs = []
+        if isinstance(formula, dict):
+            formula = ''.join(str(k)+str(v) for k, v in formula.items())
         if label is None and formula != "":
             self.label = formula
         elif label is None:
@@ -41,11 +44,11 @@ class Spectrum:
             if adduct:
                 formula[adduct] += charge
             formula = ''.join(x+str(formula[x]) for x in formula if formula[x] > 0)
-            isospec = IsoSpecPy.IsoThreshold(formula = formula, threshold
+            self.isospec = IsoSpecPy.IsoThreshold(formula = formula, threshold
                                                   = threshold, absolute =
                                                   False, get_confs = False)
             self.confs = [(x[0]/abs(charge), intensity*x[1]) for x in
-                          zip(isospec.masses, isospec.probs)]
+                          zip(self.isospec.masses, self.isospec.probs)]
             # ^^^ even if charge is negative, m/zs should be positive
             self.sort_confs()
             self.formula = formula
@@ -103,6 +106,14 @@ class Spectrum:
         """
         norm = float(sum(x[1] for x in self.confs))
         return sum(x[0]*x[1]/norm for x in self.confs)
+
+    def copy(self):
+        isospec = self.isospec
+        self.isospec = None
+        ret = deepcopy(self)
+        ret.isospec = isospec
+        self.isospec = isospec
+        return ret
 
     def get_modal_peak(self):
         """
@@ -254,8 +265,8 @@ class Spectrum:
         electronic noise.
         """
         noised = rd.normal([y for x,y in self.confs], sd)
-        noised = noised - min(noised)
-        self.confs = [(x[0], y) for x, y in zip(self.confs, noised)]
+        # noised = noised - min(noised)
+        self.confs = [(x[0], y) for x, y in zip(self.confs, noised) if y > 0]
     
     def distort_intensity(self, N, gain, sd):
         """
