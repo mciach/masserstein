@@ -1,13 +1,7 @@
 import numpy as np
-import numpy.random as rd
-from numpy.linalg import solve
-from IsoSpecPy import IsoSpecPy
 from time import time
-from scipy.optimize import linprog
-from matplotlib import pyplot as plt
 from masserstein import Spectrum
 import pulp as lp
-import itertools
 
 
 def intensity_generator(confs, mzaxis):
