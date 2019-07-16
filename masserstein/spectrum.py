@@ -191,7 +191,7 @@ class Spectrum:
                 yield (other.confs[ii][0], mass, prob)
                 leftoverprob -= prob
         except IndexError:
-            raise StopIteration()
+            return
 
     def WSDistance(self, other):
         if not np.isclose(sum(x[1] for x in self.confs), 1.):
