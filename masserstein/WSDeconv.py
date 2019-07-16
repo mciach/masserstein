@@ -19,9 +19,9 @@ EXAMPLES:
 
 DESCRIPTION:
     Deconvolves overlapping isotopic distributions and returns their proportions.
-    MASS_SPECTRUM file contains the experimental spectrum in a peak list format.
+    MASS_SPECTRUM file contains the subject spectrum in a peak list format.
     MOLECULE_LIST is either an elemental formula, or a file with a list of
-    elemental formulas of molecules which proportions in the spectrum are to be estimated.
+    elemental formulas of ions which proportions in the spectrum are to be estimated.
     Lines starting with a hash # in any file are treated as comments and skipped.
     OUTPUT is the filename prefix of output files. The program writes out the following files:
     OUTPUT_proportions.txt, which stores the list of estimated proportions;
@@ -56,14 +56,13 @@ OPTIONS:
         If the experimental spectrum is processed (e.g. peak-picked and/or deisotoped), this
         value needs to be adjusted accordingly to reflect the observed signal.
     -t: float, default: 0.01
-        Maximum ion current transport distance, also interpretable as denoising penalty.
+        The denoising penalty, interpretable as a maximum feasible distance of ion transport
+        or as the cost of assuming that there is no signal in the subject spectrum. 
         The proportion of signal explained by a given theoretical envelope
-        is computed from ion current around theoretical peaks within this margin.
+        is mostly computed from ion current around theoretical peaks within this margin.
         Experimental ion current that cannot be explained by ion current transport
         is treated as background or chemical noise, so that the method performs simultaneous
         proportion estimation and denoising.
-        This parameter is also equal to the cost of assuming that the experimental spectrum
-        consists only of the noise, and there is no signal from theoretical isotopic envelopes.
         Setting this value to -1 disables denoising.
     -c: float, default: 1e-12
         Minimum detectable ion current. If a theoretical isotopic envelope matches less than
