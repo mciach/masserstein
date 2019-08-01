@@ -28,7 +28,7 @@ class Spectrum:
         self.confs = []
         if isinstance(formula, dict):
             formula = ''.join(str(k)+str(v) for k, v in formula.items())
-        if label is None and formula != "":
+        if label is None and formula is not None and formula != "":
             self.label = formula
         elif label is None:
             self.label = "Unknown"
@@ -156,6 +156,10 @@ class Spectrum:
         res.merge_confs()
         res.label = self.label
         return res
+
+    def __rmul__(self, number):
+        # Here * is commutative
+        return self * number
 
     def __len__(self):
         return len(self.confs)
