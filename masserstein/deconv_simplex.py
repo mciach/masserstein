@@ -99,7 +99,8 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         warn("""Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
-                            """ % (sum(probs)+sum(abyss)))
+                            """ % (sum(probs)+sum(abyss)),
+             stacklevel=2)
             
     return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective)}
 
