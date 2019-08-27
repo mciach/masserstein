@@ -96,11 +96,11 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
     # note: accounting for number of summands in checking of result correctness,
     # because summation of many small numbers introduces numerical errors
     if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
-        warn("""Proportions of signal and noise sum to %f instead of 1.
+        warn("""In dualdeconv2:
+Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
-                            """ % (sum(probs)+sum(abyss)),
-             stacklevel=2)
+                            """ % (sum(probs)+sum(abyss)))
             
     return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective)}
 
@@ -259,7 +259,8 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=Fal
                 vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]       
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
-        warn("""Proportions of signal and noise sum to %f instead of 1.
+        warn("""In estimate_proportions:
+Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                         """ % (sum(proportions)+sum(vortex)))    
