@@ -22,8 +22,9 @@ except NameError:
 class Spectrum:
     def __init__(self, formula, threshold=0.001, intensity = 1.0,
                          empty = False, charge=1, adduct=None, label = None):
-        ### TODO: zrobic zeby mozna bylo od razu tworzyc widmo na dwa sposoby:
-        ### albo przez formule albo przez liste confs. 
+        ### TODO1: two ways of initialization - either by formula & charge for theoretical,
+        ### or by list of confs for experimental.
+        ### TODO2: seprarate subclasses for centroid & profile spectra
         self.label = label
         self.confs = []
         if isinstance(formula, dict):
@@ -134,6 +135,8 @@ class Spectrum:
                 cmass = mass
                 cprob = 0.0
             cprob += prob
+        ### TODO3: for profile spectra, set a margin of max. 5 zero intensities
+        ### around any observed intensity to preserve peak shape
         self.confs = [x for x in ret if x[1] > 1e-12]
 
     def set_confs(self, confs):
