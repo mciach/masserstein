@@ -7,21 +7,25 @@ from warnings import warn
 
 def intensity_generator(confs, mzaxis):
         """
-        Generates intensities from spectrum sp, represented as a confs list, over m/z values from mzaxis.
+        Generates intensities from spectrum represented as a confs list,
+        over m/z values from mzaxis.
         Assumes mzaxis and confs are sorted and returns consecutive intensities.
         """
-        i = 0
-        confs.append((-1, -1))
-        mzaxis = iter(mzaxis)
-        cm = next(mzaxis)
-        for m, i in confs:
-            while cm < m or m == -1:
+        mzaxis_id = 0
+        mzaxis_len = len(mzaxis)
+        for mz, intsy in confs:
+            while mzaxis[mzaxis_id] < mz:
                 yield 0.
-                cm = next(mzaxis)
-            if cm == m:
-                yield i
-                cm = next(mzaxis)
-        confs.pop()  # ten pop nie dziala
+                mzaxis_id += 1
+                if mzaxis_id == mzaxis_len:
+                    return
+            if mzaxis[mzaxis_id] == mz:
+                yield intsy
+                mzaxis_id += 1
+                if mzaxis_id == mzaxis_len:
+                    return
+        for i in range(mzaxis_id, mzaxis_len):
+                yield 0.
 
 
 def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
@@ -45,7 +49,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         print("Global mass axis computed")
     n = len(global_mass_axis)
     k = len(thr_confs)
-    
+
     interval_lengths = [snext - scur for scur, snext in zip(global_mass_axis[:-1], global_mass_axis[1:])]
     if not quiet:
         print("Interval lengths computed")
@@ -101,18 +105,18 @@ Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                             """ % (sum(probs)+sum(abyss)))
-            
+
     return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective)}
 
 
-def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=False):
+def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, verbose=False):
     """
     Returns estimated proportions of molecules from query in spectrum.
     Performs initial filtering of formulas and experimental spectrum to speed
     up the computations.
     _____
     Parameters:
-    
+
     spectrum: Spectrum object
         The experimental (subject) spectrum.
     query: list of Spectrum objects
@@ -130,7 +134,7 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=Fal
         it is assumed that this molecule is absent in the spectrum.
         Setting this value to -1 disables filtering.
     TSC: Theoretical Spectrum Coverage, float in [0, 1]
-        The peak intensities in any theoretical spectrum will sum up to this value. 
+        The peak intensities in any theoretical spectrum will sum up to this value.
         Setting this value to 1 means that all theoretical peaks are computed,
         which is in general undesirable.
     max_threads: int
@@ -158,7 +162,7 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=Fal
     for i, q in enumerate(query):
         assert np.isclose(sum(x[1] for x in q.confs), 1.), 'Theoretical spectrum %i is not normalized' %i
         assert all(x[0] >= 0 for x in q.confs), 'Theoretical spectrum %i has negative masses!' % i
-        
+
     # Initial filtering of formulas
     envelope_bounds = []
     filtered = []
@@ -166,7 +170,7 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=Fal
         s = query[i]
         mode = s.get_modal_peak()[0]
         mn = s.confs[0][0]
-        mx = s.confs[-1][0] 
+        mx = s.confs[-1][0]
         matching_current = MDC==0. or sum(x[1] for x in exp_confs if x[0] >= mn - MTD and x[0] <= mx + MTD) >= MDC
         matching_mode = MMD==-1 or min(abs(mode - x[0]) for x in exp_confs) <= MMD
         if matching_mode and matching_current:
@@ -179,7 +183,7 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=Fal
     if verbose:
         print("Removed theoretical spectra due to no matching experimental peaks:", filtered)
         print('Envelope bounds:', envelope_bounds)
-    
+
     # Computing chunks
     chunkIDs = [0]*k  # Grouping of theoretical spectra
     # Note: order of chunkIDs corresponds to order of query, not the envelope bounds
@@ -256,16 +260,16 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8, MMD=-1, verbose=Fal
                 proportions[original_thr_spectrum_ID] = p*chunk_TICs[current_chunk_ID]
             for i, p in enumerate(dec['trash']):
                 original_conf_id = conf_IDs[i]
-                vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]       
+                vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
         warn("""In estimate_proportions:
 Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
-                        """ % (sum(proportions)+sum(vortex)))    
+                        """ % (sum(proportions)+sum(vortex)))
     return {'proportions': proportions, 'noise': vortex}
-            
+
 
 if __name__=="__main__":
     exper = [(1., 1/6.), (2., 3/6.), (3., 2/6.)]
@@ -279,7 +283,7 @@ if __name__=="__main__":
 
     exper = [(1.1, 1/3), (2.2, 5/12), (3.1, 1/4)]
 
-    
+
     exper = [(0, 1/4), (1.1, 1/6), (2.2, 5/24), (3.1, 1/8), (4, 1/4), (60, .1) ]
     ##thr1 = [(1, 1/2), (2, 1/2)]
     ##thr2 = [(2, 1/4), (3, 3/4)]
