@@ -48,8 +48,8 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         assert np.isclose(sum(x[1] for x in thrcnf), 1), 'Theoretical spectrum %i not normalized' % i
     
     # Computing a common mass axis for all spectra
-    exp_confs = [(multiplier*m, i) for m, i in exp_confs]
-    thr_confs = [[(multiplier*m, i) for m, i in cfs] for cfs in thr_confs]
+    exp_confs = [(multiplier*round(m, 6), i) for m, i in exp_confs]
+    thr_confs = [[(multiplier*round(m, 6), i) for m, i in cfs] for cfs in thr_confs]
     global_mass_axis = set(x[0] for x in exp_confs)
     global_mass_axis.update(x[0] for s in thr_confs for x in s)
     global_mass_axis = sorted(global_mass_axis)

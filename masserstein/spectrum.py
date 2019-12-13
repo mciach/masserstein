@@ -13,6 +13,7 @@ from collections import Counter
 import numpy.random as rd
 from scipy.ndimage import gaussian_filter
 from copy import deepcopy
+from numpy import trapz
 
 try:
     xrange
@@ -346,12 +347,57 @@ class Spectrum:
         Note that this function should only be applied to profile spectra - the result
         does not make sense for centroided spectrum.
         Applying a gaussian or Savitzky-Golay filter prior to peak picking
-        is advised, in order to avoid detection of noise.
+        is advised in order to avoid detection of noise.
         """
         diffs = [n[1]-p[1] for n,p in zip(self.confs[1:], self.confs[:-1])]
         is_max = [nd <0 and pd > 0 for nd, pd in zip(diffs[1:], diffs[:-1])]
         peaks = [x for x, p in zip(self.confs[1:-1], is_max) if p]
         return peaks
+
+    def centroid(self, max_width, peak_height_fraction=0.5):
+        """
+        Returns a list of (mz, intensity) pairs for a centroided spectrum.
+        Peaks are detected as local maxima of intensity.
+        Next, each peak is integrated in a region above the peak_height_fraction
+        of the apex intensity.
+        If a peak is wider than max_width at the peak_height_fraction of the apex intensity,
+        it is skipped.
+
+        Note that this function should only be applied to profile spectra - the result
+        does not make sense for centroided spectrum.
+        Applying a gaussian or Savitzky-Golay filter prior to peak picking
+        is advised in order to avoid detection of noise.
+        """
+        # Find the local maxima of intensity:
+        diffs = [n[1]-p[1] for n,p in zip(self.confs[1:], self.confs[:-1])]
+        is_max = [nd <0 and pd > 0 for nd, pd in zip(diffs[1:], diffs[:-1])]
+        peak_indices = [i+1 for i, m in enumerate(is_max) if m]
+        
+        mz=np.array([x[0] for x in self.confs])
+        intsy=np.array([x[1] for x in self.confs])
+        centroid_mz = []
+        centroid_intensity = []
+        max_dist = max_width/2.
+        n = len(mz)
+        for p in peak_indices:
+            current_mz = mz[p]
+            current_intsy = intsy[p]
+            right_shift = 0
+            left_shift = 0
+            while p + right_shift < n-1 and mz[p+right_shift] - mz[p] < max_dist and intsy[p+right_shift] > peak_height_fraction*current_intsy:
+                right_shift += 1
+            if intsy[p+right_shift] > peak_height_fraction*current_intsy:
+                continue
+            while p - left_shift > 1 and mz[p] - mz[p-left_shift] < max_dist and intsy[p-left_shift] > peak_height_fraction*current_intsy:
+                left_shift += 1
+            if intsy[p-left_shift] > peak_height_fraction*current_intsy:
+                continue
+            x, y = mz[(p-left_shift):(p+right_shift+1)], intsy[(p-left_shift):(p+right_shift+1)]
+            cint = trapz(y, x)
+            cmz = trapz(y*x, x)/cint
+            centroid_mz.append(cmz)
+            centroid_intensity.append(cint)
+        return(list(zip(centroid_mz, centroid_intensity)))
         
 
     def fuzzify_peaks(self, sd, step):
@@ -491,6 +537,14 @@ class Spectrum:
 
 
 
-
-
+if __name__=='__main__':
+    mz =np.linspace(1, 3, num=81)
+    intsy = 3*norm.pdf(mz, loc=1.21, scale=.04) + norm.pdf(mz, loc=2.56, scale=0.08)
+    S = Spectrum('', empty=True)
+    S.set_confs(list(zip(mz,intsy)))
+    S.plot(profile=True)
+    c = S.centroid(max_width=0.35)
+    c = [(m,i/sum(x[1] for x in c)) for m,i in c]
+    p = S.find_peaks()
+    p = [(m,i/sum(x[1] for x in p)) for m, i in p]
 
