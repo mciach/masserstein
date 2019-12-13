@@ -395,8 +395,9 @@ class Spectrum:
             x, y = mz[(p-left_shift):(p+right_shift+1)], intsy[(p-left_shift):(p+right_shift+1)]
             cint = trapz(y, x)
             cmz = trapz(y*x, x)/cint
-            centroid_mz.append(cmz)
-            centroid_intensity.append(cint)
+            if cmz not in centroid_mz:  # intensity errors may introduce artificial peaks
+                centroid_mz.append(cmz)
+                centroid_intensity.append(cint)
         return(list(zip(centroid_mz, centroid_intensity)))
         
 
