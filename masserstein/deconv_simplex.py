@@ -4,6 +4,8 @@ from masserstein import Spectrum
 import pulp as lp
 from warnings import warn
 from decimal import Decimal
+import tempfile
+
 
 
 def intensity_generator(confs, mzaxis):
@@ -95,7 +97,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         program +=  lpVars[i] - lpVars[i+1]  >= -interval_lengths[i], 'EpsMinus %i' % (i+1)
     if not quiet:
         print("Constraints written")
-    program.writeLP('WassersteinL1.lp')
+    # program.writeLP('WassersteinL1.lp')
     if not quiet:
         print("Starting solver")
     program.solve()
