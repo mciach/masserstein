@@ -1,80 +1,86 @@
-from __future__ import division
 from .peptides import get_protein_formula
 import math
 import IsoSpecPy
-from pprint import pprint
 import numpy as np
-from math import exp
 from scipy.stats import norm, uniform, gamma
 import random
 import heapq
 import re
 from collections import Counter
 import numpy.random as rd
-from scipy.ndimage import gaussian_filter
 from copy import deepcopy
 from numpy import trapz
-import numbers
 
-try:
-    xrange
-except NameError:
-    xrange = range
 
 class Spectrum:
-    def __init__(self, formula, threshold=0.001, intensity = 1.0,
-                         empty = False, charge=1, adduct=None, label = None):
-        ### TODO1: two ways of initialization - either by formula & charge for theoretical,
-        ### or by list of confs for experimental.
+    def __init__(self, formula='', threshold=0.001, charge=1, adduct=None,
+                 confs=None, label=None, **other):
+        """Initialize a Spectrum class.
+
+        Initialization can be done either by simulating a spectrum of an ion
+        with a given formula and charge, or setting a peak list.
+
+        Parameters
+        ----------
+
+        formula: str
+            The chemical formula of the molecule. If empty, then `confs`
+            cannot be None. If the formula is a valid chemical formula then
+            spectrum peaks (`confs`) are simulated.
+        threshold: float
+            Lower threshold on the intensity of simulated peaks. Used when
+            `formula` is not an empty string.
+        charge: int
+            A charge of the ion.
+        adduct: str
+            The ionizing element. When not None, then formula is updated
+            with `charge` number of adduct atoms.
+        confs: list
+            A list of tuples of mz and intensity. Confs contains peaks of an
+            initialized spectrum. If not None, then `formula` needs be an empty
+            string.
+        label: str
+            An additional spectrum label.
+        """
         ### TODO2: seprarate subclasses for centroid & profile spectra
-        self.label = label
-        self.confs = []
-        if isinstance(formula, dict):
-            formula = ''.join(str(k)+str(v) for k, v in formula.items())
-        if label is None and formula is not None and formula != "":
+        self.formula = formula
+        self.empty = False
+
+        if label is None:
             self.label = formula
-        elif label is None:
-            self.label = "Unknown"
+        else:
+            self.label = label
 
         self.charge = charge
 
-        if not isinstance(formula, str):
-            if not isinstance(formula, list):
-                formula = list(formula) # extract a generator
-            empty = True
-            if len(formula) == 0:
-                self.formula = ""
-                self.confs = []
-            else:
-                if isinstance(threshold, numbers.Number or threshold is None):
-                    assert len(formula[0]) == 2
-                    self.confs = formula
-                else:
-                    assert len(threshold) == len(formula)
-                    self.confs = list(zip(formula, threshold))
+        if formula != '' and confs is not None:
+            raise ValueError(
+                "Formula and confs cannot be set at the same time!")
+        elif confs is not None:
+            self.confs = confs
             self.sort_confs()
             self.merge_confs()
-
-        if not empty:
+        elif formula != '':
             parsed = re.findall('([A-Z][a-z]*)([0-9]*)', formula)
             formula = Counter()
             for e, n in parsed:
                 n = int(n) if n else 1
                 formula[e] += n
-            #formula = [(x[0], 0 if x[1] == '' else int(x[1])) for x in formula]
-            #formula = Counter(dict(formula))
             if adduct:
                 formula[adduct] += charge
-            formula = ''.join(x+str(formula[x]) for x in formula if formula[x] > 0)
-            self.isospec = IsoSpecPy.IsoThreshold(formula = formula, threshold
-                                                  = threshold, absolute =
-                                                  False, get_confs = False)
-            self.confs = [(x[0]/abs(charge), intensity*x[1]) for x in
+            assert all(v >= 0 for v in formula.values())
+            formula = ''.join(x+str(formula[x]) for x in formula if formula[x])
+            # TODO Add IsoLayered
+            self.isospec = IsoSpecPy.IsoThreshold(formula=formula,
+                                                  threshold=threshold,
+                                                  absolute=False,
+                                                  get_confs=False)
+            self.confs = [(x[0]/abs(charge), x[1]) for x in
                           zip(self.isospec.masses, self.isospec.probs)]
-            # ^^^ even if charge is negative, m/zs should be positive
             self.sort_confs()
-            self.formula = formula
-        # empty or not charge is must have!
+        else:
+            self.empty = True
+            self.confs = []
 
     @staticmethod
     def new_from_fasta(fasta, threshold=0.001, intensity = 1.0, empty = False,
@@ -111,13 +117,12 @@ class Spectrum:
 
 
     @staticmethod
-    def new_random(domain = (0.0, 1.0), peaks = 10):
-        ret = Spectrum("", 0.0, empty = True)
-        ret.confs = []
-        for _ in xrange(peaks):
-            ret.confs.append((random.uniform(*domain), random.uniform(0.0, 1.0)))
-        ret.sort_confs()
-        ret.normalize()
+    def new_random(domain=(0.0, 1.0), peaks=10):
+        ret = Spectrum()
+        confs = []
+        for _ in range(peaks):
+            confs.append((random.uniform(*domain), random.uniform(0.0, 1.0)))
+        ret.set_confs(confs)
         return ret
 
     def average_mass(self):
@@ -189,7 +194,7 @@ class Spectrum:
     @staticmethod
     def ScalarProduct(spectra, weights):
         ret = Spectrum("", 0.0, empty = True)
-        Q = [(spectra[i].confs[0], i, 0) for i in xrange(len(spectra))]
+        Q = [(spectra[i].confs[0], i, 0) for i in range(len(spectra))]
         heapq.heapify(Q)
         while Q != []:
             conf, spectre_no, conf_idx = heapq.heappop(Q)
@@ -232,7 +237,7 @@ class Spectrum:
         defined as sum of minima of intensities, mass-wise.
         """
         e = 0
-        for i in xrange(len(self.confs)):
+        for i in range(len(self.confs)):
             e += min(self.confs[i][1],other.confs[i][1])
         return e
 
@@ -293,7 +298,7 @@ class Spectrum:
         noised = rd.normal([y for x,y in self.confs], sd)
         # noised = noised - min(noised)
         self.confs = [(x[0], y) for x, y in zip(self.confs, noised) if y > 0]
-    
+
     def distort_intensity(self, N, gain, sd):
         """
         Distorts the intensity measurement in a mutiplicative noise model - i.e.
@@ -390,7 +395,7 @@ class Spectrum:
         diffs = [n[1]-p[1] for n,p in zip(self.confs[1:], self.confs[:-1])]
         is_max = [nd <0 and pd > 0 for nd, pd in zip(diffs[1:], diffs[:-1])]
         peak_indices = [i+1 for i, m in enumerate(is_max) if m]
-        
+
         mz=np.array([x[0] for x in self.confs])
         intsy=np.array([x[1] for x in self.confs])
         centroid_mz = []
@@ -417,7 +422,7 @@ class Spectrum:
                 centroid_mz.append(cmz)
                 centroid_intensity.append(cint)
         return(list(zip(centroid_mz, centroid_intensity)))
-        
+
 
     def fuzzify_peaks(self, sd, step):
         """
@@ -476,7 +481,7 @@ class Spectrum:
         for b in bounds:
             if b[0] <= c:
                 pass # to be finished
-        
+
 
     @staticmethod
     def filter_against_theoretical(experimental, theoreticals, margin=0.15):
@@ -520,22 +525,24 @@ class Spectrum:
         new_spectrum.confs = result_confs
         return new_spectrum
 
-    def plot(self, show = True, profile=False, **plot_kwargs):
+    def plot(self, show = True, profile=False, linewidth=1, **plot_kwargs):
         import matplotlib.pyplot as plt
         if show:
             plt.clf()
         if profile:
-            plt.plot([x[0] for x in self.confs], [x[1] for x in self.confs], linestyle='-', label=self.label, **plot_kwargs)
+            plt.plot([x[0] for x in self.confs], [x[1] for x in self.confs],
+                     linestyle='-', label=self.label, **plot_kwargs)
         else:
-            plt.vlines([x[0] for x in self.confs], [0], [x[1] for x in self.confs], label = self.label, linewidth=1, **plot_kwargs)
+            plt.vlines([x[0] for x in self.confs], [0],
+                       [x[1] for x in self.confs], label = self.label,
+                       linewidth=linewidth, **plot_kwargs)
         if show:
             plt.show()
 
     @staticmethod
-    def plot_all(spectra, show=True, profile=False, cmap=None):
+    def plot_all(spectra, show=True, profile=False, cmap=None, **plot_kwargs):
         import matplotlib.pyplot as plt
         import matplotlib.cm as cm
-        import numpy as np
         if not cmap:
             colors = cm.rainbow(np.linspace(0, 1, len(spectra)))
             colors =  [[0, 0, 0, 0.8]] + [list(x[:3]) + [0.6] for x in colors]
@@ -544,26 +551,11 @@ class Spectrum:
                 colors = [[0, 0, 0, 0.8]] + [cmap(x, alpha=1) for x in range(len(spectra))]
             except:
                 colors = cmap
-        if show:
-            plt.clf()
         i = 0
         for spectre in spectra:
-            spectre.plot(show = False, profile=profile, color = colors[i])
+            spectre.plot(show = False, profile=profile, color = colors[i],
+                         **plot_kwargs)
             i += 1
         #plt.legend(loc=9, bbox_to_anchor=(0.5, -0.1), ncol=len(spectra))  # legend below plot
         plt.legend(loc=0, ncol=1)
         if show: plt.show()
-
-
-
-if __name__=='__main__':
-    mz =np.linspace(1, 3, num=81)
-    intsy = 3*norm.pdf(mz, loc=1.21, scale=.04) + norm.pdf(mz, loc=2.56, scale=0.08)
-    S = Spectrum('', empty=True)
-    S.set_confs(list(zip(mz,intsy)))
-    S.plot(profile=True)
-    c = S.centroid(max_width=0.35)
-    c = [(m,i/sum(x[1] for x in c)) for m,i in c]
-    p = S.find_peaks()
-    p = [(m,i/sum(x[1] for x in p)) for m, i in p]
-
