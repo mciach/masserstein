@@ -14,6 +14,7 @@ import numpy.random as rd
 from scipy.ndimage import gaussian_filter
 from copy import deepcopy
 from numpy import trapz
+import numbers
 
 try:
     xrange
@@ -35,6 +36,25 @@ class Spectrum:
         elif label is None:
             self.label = "Unknown"
 
+        self.charge = charge
+
+        if not isinstance(formula, str):
+            if not isinstance(formula, list):
+                formula = list(formula) # extract a generator
+            empty = True
+            if len(formula) == 0:
+                self.formula = ""
+                self.confs = []
+            else:
+                if isinstance(threshold, numbers.Number or threshold is None):
+                    assert len(formula[0]) == 2
+                    self.confs = formula
+                else:
+                    assert len(threshold) == len(formula)
+                    self.confs = list(zip(formula, threshold))
+            self.sort_confs()
+            self.merge_confs()
+
         if not empty:
             parsed = re.findall('([A-Z][a-z]*)([0-9]*)', formula)
             formula = Counter()
@@ -55,8 +75,6 @@ class Spectrum:
             self.sort_confs()
             self.formula = formula
         # empty or not charge is must have!
-        self.charge = charge
-        self.is_this_noise = [False]*len(self.confs)
 
     @staticmethod
     def new_from_fasta(fasta, threshold=0.001, intensity = 1.0, empty = False,
