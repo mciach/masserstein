@@ -9,7 +9,6 @@ import re
 from collections import Counter
 import numpy.random as rd
 from copy import deepcopy
-from numpy import trapz
 
 
 class Spectrum:
@@ -91,7 +90,7 @@ class Spectrum:
 
     @staticmethod
     def new_from_csv(filename, delimiter=","):
-        spectrum = Spectrum("", empty=True, label=filename)
+        spectrum = Spectrum(label=filename)
 
         with open(filename, "r") as infile:
             header = next(infile)
@@ -169,7 +168,7 @@ class Spectrum:
         self.merge_confs()
 
     def __add__(self, other):
-        res = Spectrum("", 0.0, empty=True)
+        res = Spectrum()
         res.confs = self.confs + other.confs
         res.sort_confs()
         res.merge_confs()
@@ -177,10 +176,8 @@ class Spectrum:
         return res
 
     def __mul__(self, number):
-        res = Spectrum("", 0.0, empty=True)
-        res.confs = [(x[0], number*x[1]) for x in self.confs]
-        res.sort_confs()
-        res.merge_confs()
+        res = Spectrum()
+        res.set_confs([(x[0], number*x[1]) for x in self.confs])
         res.label = self.label
         return res
 
@@ -193,7 +190,7 @@ class Spectrum:
 
     @staticmethod
     def ScalarProduct(spectra, weights):
-        ret = Spectrum("", 0.0, empty = True)
+        ret = Spectrum()
         Q = [(spectra[i].confs[0], i, 0) for i in range(len(spectra))]
         heapq.heapify(Q)
         while Q != []:
@@ -416,8 +413,8 @@ class Spectrum:
             if intsy[p-left_shift] > peak_height_fraction*current_intsy:
                 continue
             x, y = mz[(p-left_shift):(p+right_shift+1)], intsy[(p-left_shift):(p+right_shift+1)]
-            cint = trapz(y, x)
-            cmz = trapz(y*x, x)/cint
+            cint = np.trapz(y, x)
+            cmz = np.trapz(y*x, x)/cint
             if cmz not in centroid_mz:  # intensity errors may introduce artificial peaks
                 centroid_mz.append(cmz)
                 centroid_intensity.append(cint)
@@ -486,24 +483,32 @@ class Spectrum:
     @staticmethod
     def filter_against_theoretical(experimental, theoreticals, margin=0.15):
         """
-        Remove trash empirical spectra fragments and leave only interesting.
+        Remove signal from the empirical spectra which is far from theoretical.
 
-        Removes from experimental spectrum fragments outside theoretical peaks
-        +- margin.
+        This method remmoves peaks from experimental spectrum which outside
+        theoretical peaks +/- margin.
 
-        experimental: empirical spectrum,
-        theoreticals: one instance of theoretical or iterable of instances of
-                    theoretical spectra,
-        margin: m/z radius within empirical spectrum should be left.
+        Parameters
+        ----------
+        experimental
+            Empirical spectrum.
+        theoreticals:
+            One instance of theoretical or iterable of instances of theoretical
+            spectra.
+        margin
+            m/z radius within empirical spectrum should be left.
+
+        Returns
+        -------
+        Spectrum
+            An empirical spectrum with filtered out peaks.
         """
         try:
             th_confs = []
             for theoretical_spectrum in theoreticals:
                 th_confs.extend(theoretical_spectrum.confs)
-            theoretical = Spectrum("", empty=True)
-            theoretical.confs = th_confs
-            theoretical.sort_confs()
-            theoretical.merge_confs()
+            theoretical = Spectrum()
+            theoretical.set_confs(th_confs)
         except TypeError:
             theoretical = theoreticals
         experimental_confs = experimental.confs
@@ -519,9 +524,7 @@ class Spectrum:
                     index + 1 < len(theoretical_masses) and
                     abs(mz - theoretical_masses[index + 1]) <= margin):
                 result_confs.append((mz, abund))
-        new_spectrum = Spectrum("", empty=True,
-                                label=experimental.label if
-                                hasattr(experimental, 'label') else None)
+        new_spectrum = Spectrum(label=experimental.label)
         new_spectrum.confs = result_confs
         return new_spectrum
 
