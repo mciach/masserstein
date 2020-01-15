@@ -496,7 +496,7 @@ class Spectrum:
         """
         Remove signal from the empirical spectra which is far from theoretical.
 
-        This method remmoves peaks from experimental spectrum which outside
+        This method removes peaks from experimental spectrum which are outside
         theoretical peaks +/- margin.
 
         Parameters
