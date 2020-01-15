@@ -1,4 +1,3 @@
-from .peptides import get_protein_formula
 import math
 import IsoSpecPy
 import numpy as np
@@ -8,16 +7,19 @@ import heapq
 import re
 from collections import Counter
 import numpy.random as rd
-from copy import deepcopy
+from .peptides import get_protein_formula
 
 
 class Spectrum:
-    def __init__(self, formula='', threshold=0.001, charge=1, adduct=None,
-                 confs=None, label=None, **other):
+    def __init__(self, formula='', threshold=0.001, total_prob=None,
+                 charge=1, adduct=None, confs=None, label=None, **other):
         """Initialize a Spectrum class.
 
         Initialization can be done either by simulating a spectrum of an ion
         with a given formula and charge, or setting a peak list.
+
+        The initialized spectrum is not normalised. In order to do this use
+        normalize method.
 
         Parameters
         ----------
@@ -28,7 +30,13 @@ class Spectrum:
             spectrum peaks (`confs`) are simulated.
         threshold: float
             Lower threshold on the intensity of simulated peaks. Used when
-            `formula` is not an empty string.
+            `formula` is not an empty string, ignored when `total_prob` is not
+            None.
+        total_prob: float
+            Lower bound on the total probability of simulated peaks, i.e.
+            fraction of all potential signal, which will be simulated. Used
+            when `formula` is not an empty string. When not None, then
+            `threshold` value is ignored.
         charge: int
             A charge of the ion.
         adduct: str
@@ -56,37 +64,51 @@ class Spectrum:
             raise ValueError(
                 "Formula and confs cannot be set at the same time!")
         elif confs is not None:
-            self.confs = confs
-            self.sort_confs()
-            self.merge_confs()
+            self.set_confs(confs)
         elif formula != '':
-            parsed = re.findall('([A-Z][a-z]*)([0-9]*)', formula)
-            formula = Counter()
-            for e, n in parsed:
-                n = int(n) if n else 1
-                formula[e] += n
-            if adduct:
-                formula[adduct] += charge
-            assert all(v >= 0 for v in formula.values())
-            formula = ''.join(x+str(formula[x]) for x in formula if formula[x])
-            # TODO Add IsoLayered
-            self.isospec = IsoSpecPy.IsoThreshold(formula=formula,
-                                                  threshold=threshold,
-                                                  absolute=False,
-                                                  get_confs=False)
-            self.confs = [(x[0]/abs(charge), x[1]) for x in
-                          zip(self.isospec.masses, self.isospec.probs)]
-            self.sort_confs()
+            self.set_confs(
+                self.confs_from_formula(
+                    formula, threshold, total_prob, charge, adduct))
         else:
             self.empty = True
             self.confs = []
 
     @staticmethod
-    def new_from_fasta(fasta, threshold=0.001, intensity = 1.0, empty = False,
-                       charge=1, label = None):
+    def confs_from_formula(formula, threshold=0.001, total_prob=None,
+                           charge=1, adduct=None):
+        """Simulate and return spectrum peaks for given formula.
+
+        Parameters as in __init__ method. `formula` must be a nonempty string.
+        """
+        parsed = re.findall('([A-Z][a-z]*)([0-9]*)', formula)
+        formula = Counter()
+        for e, n in parsed:
+            n = int(n) if n else 1
+            formula[e] += n
+        if adduct:
+            formula[adduct] += charge
+        assert all(v >= 0 for v in formula.values())
+        formula = ''.join(x+str(formula[x]) for x in formula if formula[x])
+        if total_prob is not None:
+            isospec = IsoSpecPy.IsoTotalProb(formula=formula,
+                                             prob_to_cover=total_prob,
+                                             get_minimal_pset=True,
+                                             get_confs=False)
+        else:
+            isospec = IsoSpecPy.IsoThreshold(formula=formula,
+                                             threshold=threshold,
+                                             absolute=False,
+                                             get_confs=False)
+        confs = [(x[0]/abs(charge), x[1]) for x in
+                 zip(isospec.masses, isospec.probs)]
+        return confs
+
+    @staticmethod
+    def new_from_fasta(fasta, threshold=0.001, total_prob=None, intensity=1.0,
+                       empty=False, charge=1, label=None):
         return Spectrum(get_protein_formula(fasta), threshold=threshold,
-                        intensity=intensity, empty=empty, charge=charge,
-                        label=label)
+                        total_prob=total_prob, intensity=intensity,
+                        empty=empty, charge=charge, label=label)
 
     @staticmethod
     def new_from_csv(filename, delimiter=","):
@@ -104,17 +126,6 @@ class Spectrum:
         spectrum.merge_confs()
         return spectrum
 
-
-    @staticmethod
-    def new_from_masses_int(masses, intensities):
-        ret = Spectrum("", 0.0, empty = True)
-        assert len(masses) == len(intensities)
-        ret.confs = zip(masses, intensities)
-        ret.sort_confs()
-        ret.normalize()
-        return ret
-
-
     @staticmethod
     def new_random(domain=(0.0, 1.0), peaks=10):
         ret = Spectrum()
@@ -131,13 +142,13 @@ class Spectrum:
         norm = float(sum(x[1] for x in self.confs))
         return sum(x[0]*x[1]/norm for x in self.confs)
 
-    def copy(self):
-        isospec = self.isospec
-        self.isospec = None
-        ret = deepcopy(self)
-        ret.isospec = isospec
-        self.isospec = isospec
-        return ret
+    # def copy(self):
+    #     isospec = self.isospec
+    #     self.isospec = None
+    #     ret = deepcopy(self)
+    #     ret.isospec = isospec
+    #     self.isospec = isospec
+    #     return ret
 
     def get_modal_peak(self):
         """
