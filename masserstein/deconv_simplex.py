@@ -3,6 +3,9 @@ from time import time
 from masserstein import Spectrum
 import pulp as lp
 from warnings import warn
+from decimal import Decimal
+import tempfile
+
 
 
 def intensity_generator(confs, mzaxis):
@@ -38,10 +41,17 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
     start = time()
     exp_confs = exp_sp.confs.copy()
     thr_confs = [thr_sp.confs.copy() for thr_sp in thr_sps]
+
+    multiplier = 1e04  # to avoid catastrophic cancellations
+    penalty *= multiplier
     # Normalization check:
     assert np.isclose(sum(x[1] for x in exp_confs) , 1), 'Experimental spectrum not normalized'
     for i, thrcnf in enumerate(thr_confs):
         assert np.isclose(sum(x[1] for x in thrcnf), 1), 'Theoretical spectrum %i not normalized' % i
+    
+    # Computing a common mass axis for all spectra
+    exp_confs = [(multiplier*round(m, 6), i) for m, i in exp_confs]
+    thr_confs = [[(multiplier*round(m, 6), i) for m, i in cfs] for cfs in thr_confs]
     global_mass_axis = set(x[0] for x in exp_confs)
     global_mass_axis.update(x[0] for s in thr_confs for x in s)
     global_mass_axis = sorted(global_mass_axis)
@@ -50,9 +60,11 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
     n = len(global_mass_axis)
     k = len(thr_confs)
 
-    interval_lengths = [snext - scur for scur, snext in zip(global_mass_axis[:-1], global_mass_axis[1:])]
+    # Computing lengths of intervals between mz measurements (l_i variables)
+    interval_lengths = [global_mass_axis[i+1] - global_mass_axis[i] for i in range(n-1)]
     if not quiet:
         print("Interval lengths computed")
+        
     # linear program:
     program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
     if not quiet:
@@ -77,12 +89,15 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars) if v > 0.) <= 0, 'P%i' % (j+1)
     if not quiet:
         print('tsk tsk')
+##    for i in range(n-1):
+##        program += lpVars[i]-lpVars[i+1] <= interval_lengths[i], 'EpsPlus %i' % (i+1)
+##        program += lpVars[i] - lpVars[i+1] >=  -interval_lengths[i], 'EpsMinus %i' % (i+1)
     for i in range(n-1):
-        program += lpVars[i]-lpVars[i+1] <= interval_lengths[i], 'EpsPlus %i' % (i+1)
-        program += lpVars[i] - lpVars[i+1] >=  -interval_lengths[i], 'EpsMinus %i' % (i+1)
+        program +=  lpVars[i] - lpVars[i+1]  <=  interval_lengths[i], 'EpsPlus %i' % (i+1)
+        program +=  lpVars[i] - lpVars[i+1]  >= -interval_lengths[i], 'EpsMinus %i' % (i+1)
     if not quiet:
         print("Constraints written")
-    program.writeLP('WassersteinL1.lp')
+    # program.writeLP('WassersteinL1.lp')
     if not quiet:
         print("Starting solver")
     program.solve()
@@ -90,7 +105,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
     if not quiet:
         print("Solver finished.")
         print("Status:", lp.LpStatus[program.status])
-        print("Optimal value:", lp.value(program.objective))
+        print("Optimal value:", lp.value(program.objective)/multiplier)
         print("Time:", end - start)
     constraints = program.constraints
     probs = [round(constraints['P%i' % i].pi, 12) for i in range(1, k+1)]
@@ -106,10 +121,10 @@ This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                             """ % (sum(probs)+sum(abyss)))
 
-    return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective)}
+    return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective), 'status': program.status}
 
 
-def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, verbose=False):
+def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False):
     """
     Returns estimated proportions of molecules from query in spectrum.
     Performs initial filtering of formulas and experimental spectrum to speed
@@ -137,8 +152,10 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, verbose=Fals
         The peak intensities in any theoretical spectrum will sum up to this value.
         Setting this value to 1 means that all theoretical peaks are computed,
         which is in general undesirable.
-    max_threads: int
-        Maximum numbers of subprocesses to spawn during deconvolution.
+    max_reruns: int
+        Due to numerical errors, some partial results may be inaccurate.
+        If this is detected, then those results are recomputed for a maximal number of times
+        given by this parameter.
     verbose: bool
         Print diagnistic messages?
     _____
@@ -153,14 +170,14 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, verbose=Fals
     except:
         print("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?")
         raise
-    assert np.isclose(sum(x[1] for x in exp_confs), 1.), 'The experimental spectrum is not normalized.'
+    assert abs(sum(x[1] for x in exp_confs) - 1.) < 1e-08, 'The experimental spectrum is not normalized.'
     assert all(x[0] >= 0. for x in exp_confs), 'Found experimental peaks with negative masses!'
     vortex = [0.]*len(exp_confs)  # unxplained signal
     k = len(query)
     proportions = [0.]*k
 
     for i, q in enumerate(query):
-        assert np.isclose(sum(x[1] for x in q.confs), 1.), 'Theoretical spectrum %i is not normalized' %i
+        assert abs(sum(x[1] for x in q.confs) - 1.) < 1e-08, 'Theoretical spectrum %i is not normalized' %i
         assert all(x[0] >= 0 for x in q.confs), 'Theoretical spectrum %i has negative masses!' % i
 
     # Initial filtering of formulas
@@ -254,7 +271,23 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, verbose=Fals
             chunkSp.normalize()
             theoretical_spectra_IDs = [i for i, c in enumerate(chunkIDs) if c == current_chunk_ID]
             thrSp = [query[i] for i in theoretical_spectra_IDs]
-            dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True)
+
+            rerun = 0
+            success = False
+            while not success:
+                    rerun += 1
+                    if rerun > max_reruns:
+                            raise RuntimeError('Failed to deconvolve a fragment of the experimental spectrum with mass (%f, %f)' % chunk_bounds[current_chunk_ID])
+                    dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True)
+                    if dec['status'] == 1:
+                            success=True
+                    else:
+                            warn('Rerunning computations for chunk %i due to status %s' % (current_chunk_ID, lp.LpStatus[dec['status']]))
+            if verbose:
+                    print('Chunk %i deconvolution status:', lp.LpStatus[dec['status']])
+                    print('Signal proportion:', sum(dec['probs']))
+                    print('Noise proportion:', sum(dec['trash']))
+                    print('Total explanation:', sum(dec['probs'])+sum(dec['trash']))
             for i, p in enumerate(dec['probs']):
                 original_thr_spectrum_ID = theoretical_spectra_IDs[i]
                 proportions[original_thr_spectrum_ID] = p*chunk_TICs[current_chunk_ID]
@@ -304,6 +337,16 @@ if __name__=="__main__":
     print('sum:', sum(sol2['probs']+sol2['trash']))
     test = estimate_proportions(experSp, thrSp, MTD=.2, MMD=0.21)
 
+    chunk_confs = [[1. + 1e-06, 0.6], [1.4, 0.4]]
+    query_confs = [(1.00000, 0.6), (1.5, 0.4)]
+    badSp = Spectrum('', empty=True)
+    badSp.set_confs(chunk_confs)
+    badSp.normalize()
+
+    qSp = Spectrum('', empty=True)
+    qSp.set_confs(query_confs)
+    qSp.normalize()
+    dualdeconv2(badSp, [qSp], 0.003, quiet=False)
 
     # Other tests:
 ##    experSp2 = Spectrum('', empty=True)

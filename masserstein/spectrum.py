@@ -1,90 +1,118 @@
-from __future__ import division
-from .peptides import get_protein_formula
 import math
 import IsoSpecPy
-from pprint import pprint
 import numpy as np
-from math import exp
 from scipy.stats import norm, uniform, gamma
 import random
 import heapq
 import re
 from collections import Counter
 import numpy.random as rd
-from scipy.ndimage import gaussian_filter
-from copy import deepcopy
-import numbers
+from .peptides import get_protein_formula
 
-try:
-    xrange
-except NameError:
-    xrange = range
 
 class Spectrum:
-    def __init__(self, formula, threshold=0.001, intensity = 1.0,
-                         empty = False, charge=1, adduct=None, label = None):
-        ### TODO1: two ways of initialization - either by formula & charge for theoretical,
-        ### or by list of confs for experimental.
+    def __init__(self, formula='', threshold=0.001, total_prob=None,
+                 charge=1, adduct=None, confs=None, label=None, **other):
+        """Initialize a Spectrum class.
+
+        Initialization can be done either by simulating a spectrum of an ion
+        with a given formula and charge, or setting a peak list.
+
+        The initialized spectrum is not normalised. In order to do this use
+        normalize method.
+
+        Parameters
+        ----------
+
+        formula: str
+            The chemical formula of the molecule. If empty, then `confs`
+            cannot be None. If the formula is a valid chemical formula then
+            spectrum peaks (`confs`) are simulated.
+        threshold: float
+            Lower threshold on the intensity of simulated peaks. Used when
+            `formula` is not an empty string, ignored when `total_prob` is not
+            None.
+        total_prob: float
+            Lower bound on the total probability of simulated peaks, i.e.
+            fraction of all potential signal, which will be simulated. Used
+            when `formula` is not an empty string. When not None, then
+            `threshold` value is ignored.
+        charge: int
+            A charge of the ion.
+        adduct: str
+            The ionizing element. When not None, then formula is updated
+            with `charge` number of adduct atoms.
+        confs: list
+            A list of tuples of mz and intensity. Confs contains peaks of an
+            initialized spectrum. If not None, then `formula` needs be an empty
+            string.
+        label: str
+            An additional spectrum label.
+        """
         ### TODO2: seprarate subclasses for centroid & profile spectra
-        self.label = label
-        self.confs = []
-        if isinstance(formula, dict):
-            formula = ''.join(str(k)+str(v) for k, v in formula.items())
-        if label is None and formula is not None and formula != "":
+        self.formula = formula
+        self.empty = False
+
+        if label is None:
             self.label = formula
-        elif label is None:
-            self.label = "Unknown"
+        else:
+            self.label = label
 
         self.charge = charge
 
-        if not isinstance(formula, str):
-            if not isinstance(formula, list):
-                formula = list(formula) # extract a generator
-            empty = True
-            if len(formula) == 0:
-                self.formula = ""
-                self.confs = []
-            else:
-                if isinstance(threshold, numbers.Number or threshold is None):
-                    assert len(formula[0]) == 2
-                    self.confs = formula
-                else:
-                    assert len(threshold) == len(formula)
-                    self.confs = list(zip(formula, threshold))
-            self.sort_confs()
-            self.merge_confs()
-
-        if not empty:
-            parsed = re.findall('([A-Z][a-z]*)([0-9]*)', formula)
-            formula = Counter()
-            for e, n in parsed:
-                n = int(n) if n else 1
-                formula[e] += n
-            #formula = [(x[0], 0 if x[1] == '' else int(x[1])) for x in formula]
-            #formula = Counter(dict(formula))
-            if adduct:
-                formula[adduct] += charge
-            formula = ''.join(x+str(formula[x]) for x in formula if formula[x] > 0)
-            self.isospec = IsoSpecPy.IsoThreshold(formula = formula, threshold
-                                                  = threshold, absolute =
-                                                  False, get_confs = False)
-            self.confs = [(x[0]/abs(charge), intensity*x[1]) for x in
-                          zip(self.isospec.masses, self.isospec.probs)]
-            # ^^^ even if charge is negative, m/zs should be positive
-            self.sort_confs()
-            self.formula = formula
-        # empty or not charge is must have!
+        if formula != '' and confs is not None:
+            raise ValueError(
+                "Formula and confs cannot be set at the same time!")
+        elif confs is not None:
+            self.set_confs(confs)
+        elif formula != '':
+            self.set_confs(
+                self.confs_from_formula(
+                    formula, threshold, total_prob, charge, adduct))
+        else:
+            self.empty = True
+            self.confs = []
 
     @staticmethod
-    def new_from_fasta(fasta, threshold=0.001, intensity = 1.0, empty = False,
-                       charge=1, label = None):
+    def confs_from_formula(formula, threshold=0.001, total_prob=None,
+                           charge=1, adduct=None):
+        """Simulate and return spectrum peaks for given formula.
+
+        Parameters as in __init__ method. `formula` must be a nonempty string.
+        """
+        parsed = re.findall('([A-Z][a-z]*)([0-9]*)', formula)
+        formula = Counter()
+        for e, n in parsed:
+            n = int(n) if n else 1
+            formula[e] += n
+        if adduct:
+            formula[adduct] += charge
+        assert all(v >= 0 for v in formula.values())
+        formula = ''.join(x+str(formula[x]) for x in formula if formula[x])
+        if total_prob is not None:
+            isospec = IsoSpecPy.IsoTotalProb(formula=formula,
+                                             prob_to_cover=total_prob,
+                                             get_minimal_pset=True,
+                                             get_confs=False)
+        else:
+            isospec = IsoSpecPy.IsoThreshold(formula=formula,
+                                             threshold=threshold,
+                                             absolute=False,
+                                             get_confs=False)
+        confs = [(x[0]/abs(charge), x[1]) for x in
+                 zip(isospec.masses, isospec.probs)]
+        return confs
+
+    @staticmethod
+    def new_from_fasta(fasta, threshold=0.001, total_prob=None, intensity=1.0,
+                       empty=False, charge=1, label=None):
         return Spectrum(get_protein_formula(fasta), threshold=threshold,
-                        intensity=intensity, empty=empty, charge=charge,
-                        label=label)
+                        total_prob=total_prob, intensity=intensity,
+                        empty=empty, charge=charge, label=label)
 
     @staticmethod
     def new_from_csv(filename, delimiter=","):
-        spectrum = Spectrum("", empty=True, label=filename)
+        spectrum = Spectrum(label=filename)
 
         with open(filename, "r") as infile:
             header = next(infile)
@@ -98,25 +126,13 @@ class Spectrum:
         spectrum.merge_confs()
         return spectrum
 
-
     @staticmethod
-    def new_from_masses_int(masses, intensities):
-        ret = Spectrum("", 0.0, empty = True)
-        assert len(masses) == len(intensities)
-        ret.confs = zip(masses, intensities)
-        ret.sort_confs()
-        ret.normalize()
-        return ret
-
-
-    @staticmethod
-    def new_random(domain = (0.0, 1.0), peaks = 10):
-        ret = Spectrum("", 0.0, empty = True)
-        ret.confs = []
-        for _ in xrange(peaks):
-            ret.confs.append((random.uniform(*domain), random.uniform(0.0, 1.0)))
-        ret.sort_confs()
-        ret.normalize()
+    def new_random(domain=(0.0, 1.0), peaks=10):
+        ret = Spectrum()
+        confs = []
+        for _ in range(peaks):
+            confs.append((random.uniform(*domain), random.uniform(0.0, 1.0)))
+        ret.set_confs(confs)
         return ret
 
     def average_mass(self):
@@ -126,13 +142,13 @@ class Spectrum:
         norm = float(sum(x[1] for x in self.confs))
         return sum(x[0]*x[1]/norm for x in self.confs)
 
-    def copy(self):
-        isospec = self.isospec
-        self.isospec = None
-        ret = deepcopy(self)
-        ret.isospec = isospec
-        self.isospec = isospec
-        return ret
+    # def copy(self):
+    #     isospec = self.isospec
+    #     self.isospec = None
+    #     ret = deepcopy(self)
+    #     ret.isospec = isospec
+    #     self.isospec = isospec
+    #     return ret
 
     def get_modal_peak(self):
         """
@@ -163,7 +179,7 @@ class Spectrum:
         self.merge_confs()
 
     def __add__(self, other):
-        res = Spectrum("", 0.0, empty=True)
+        res = Spectrum()
         res.confs = self.confs + other.confs
         res.sort_confs()
         res.merge_confs()
@@ -171,10 +187,8 @@ class Spectrum:
         return res
 
     def __mul__(self, number):
-        res = Spectrum("", 0.0, empty=True)
-        res.confs = [(x[0], number*x[1]) for x in self.confs]
-        res.sort_confs()
-        res.merge_confs()
+        res = Spectrum()
+        res.set_confs([(x[0], number*x[1]) for x in self.confs])
         res.label = self.label
         return res
 
@@ -187,8 +201,8 @@ class Spectrum:
 
     @staticmethod
     def ScalarProduct(spectra, weights):
-        ret = Spectrum("", 0.0, empty = True)
-        Q = [(spectra[i].confs[0], i, 0) for i in xrange(len(spectra))]
+        ret = Spectrum()
+        Q = [(spectra[i].confs[0], i, 0) for i in range(len(spectra))]
         heapq.heapify(Q)
         while Q != []:
             conf, spectre_no, conf_idx = heapq.heappop(Q)
@@ -231,7 +245,7 @@ class Spectrum:
         defined as sum of minima of intensities, mass-wise.
         """
         e = 0
-        for i in xrange(len(self.confs)):
+        for i in range(len(self.confs)):
             e += min(self.confs[i][1],other.confs[i][1])
         return e
 
@@ -292,7 +306,7 @@ class Spectrum:
         noised = rd.normal([y for x,y in self.confs], sd)
         # noised = noised - min(noised)
         self.confs = [(x[0], y) for x, y in zip(self.confs, noised) if y > 0]
-    
+
     def distort_intensity(self, N, gain, sd):
         """
         Distorts the intensity measurement in a mutiplicative noise model - i.e.
@@ -364,13 +378,59 @@ class Spectrum:
         Note that this function should only be applied to profile spectra - the result
         does not make sense for centroided spectrum.
         Applying a gaussian or Savitzky-Golay filter prior to peak picking
-        is advised, in order to avoid detection of noise.
+        is advised in order to avoid detection of noise.
         """
         diffs = [n[1]-p[1] for n,p in zip(self.confs[1:], self.confs[:-1])]
         is_max = [nd <0 and pd > 0 for nd, pd in zip(diffs[1:], diffs[:-1])]
         peaks = [x for x, p in zip(self.confs[1:-1], is_max) if p]
         return peaks
-        
+
+    def centroid(self, max_width, peak_height_fraction=0.5):
+        """
+        Returns a list of (mz, intensity) pairs for a centroided spectrum.
+        Peaks are detected as local maxima of intensity.
+        Next, each peak is integrated in a region above the peak_height_fraction
+        of the apex intensity.
+        If a peak is wider than max_width at the peak_height_fraction of the apex intensity,
+        it is skipped.
+
+        Note that this function should only be applied to profile spectra - the result
+        does not make sense for centroided spectrum.
+        Applying a gaussian or Savitzky-Golay filter prior to peak picking
+        is advised in order to avoid detection of noise.
+        """
+        # Find the local maxima of intensity:
+        diffs = [n[1]-p[1] for n,p in zip(self.confs[1:], self.confs[:-1])]
+        is_max = [nd <0 and pd > 0 for nd, pd in zip(diffs[1:], diffs[:-1])]
+        peak_indices = [i+1 for i, m in enumerate(is_max) if m]
+
+        mz=np.array([x[0] for x in self.confs])
+        intsy=np.array([x[1] for x in self.confs])
+        centroid_mz = []
+        centroid_intensity = []
+        max_dist = max_width/2.
+        n = len(mz)
+        for p in peak_indices:
+            current_mz = mz[p]
+            current_intsy = intsy[p]
+            right_shift = 0
+            left_shift = 0
+            while p + right_shift < n-1 and mz[p+right_shift] - mz[p] < max_dist and intsy[p+right_shift] > peak_height_fraction*current_intsy:
+                right_shift += 1
+            if intsy[p+right_shift] > peak_height_fraction*current_intsy:
+                continue
+            while p - left_shift > 1 and mz[p] - mz[p-left_shift] < max_dist and intsy[p-left_shift] > peak_height_fraction*current_intsy:
+                left_shift += 1
+            if intsy[p-left_shift] > peak_height_fraction*current_intsy:
+                continue
+            x, y = mz[(p-left_shift):(p+right_shift+1)], intsy[(p-left_shift):(p+right_shift+1)]
+            cint = np.trapz(y, x)
+            cmz = np.trapz(y*x, x)/cint
+            if cmz not in centroid_mz:  # intensity errors may introduce artificial peaks
+                centroid_mz.append(cmz)
+                centroid_intensity.append(cint)
+        return(list(zip(centroid_mz, centroid_intensity)))
+
 
     def fuzzify_peaks(self, sd, step):
         """
@@ -429,29 +489,37 @@ class Spectrum:
         for b in bounds:
             if b[0] <= c:
                 pass # to be finished
-        
+
 
     @staticmethod
     def filter_against_theoretical(experimental, theoreticals, margin=0.15):
         """
-        Remove trash empirical spectra fragments and leave only interesting.
+        Remove signal from the empirical spectra which is far from theoretical.
 
-        Removes from experimental spectrum fragments outside theoretical peaks
-        +- margin.
+        This method removes peaks from experimental spectrum which are outside
+        theoretical peaks +/- margin.
 
-        experimental: empirical spectrum,
-        theoreticals: one instance of theoretical or iterable of instances of
-                    theoretical spectra,
-        margin: m/z radius within empirical spectrum should be left.
+        Parameters
+        ----------
+        experimental
+            Empirical spectrum.
+        theoreticals:
+            One instance of theoretical or iterable of instances of theoretical
+            spectra.
+        margin
+            m/z radius within empirical spectrum should be left.
+
+        Returns
+        -------
+        Spectrum
+            An empirical spectrum with filtered out peaks.
         """
         try:
             th_confs = []
             for theoretical_spectrum in theoreticals:
                 th_confs.extend(theoretical_spectrum.confs)
-            theoretical = Spectrum("", empty=True)
-            theoretical.confs = th_confs
-            theoretical.sort_confs()
-            theoretical.merge_confs()
+            theoretical = Spectrum()
+            theoretical.set_confs(th_confs)
         except TypeError:
             theoretical = theoreticals
         experimental_confs = experimental.confs
@@ -467,28 +535,28 @@ class Spectrum:
                     index + 1 < len(theoretical_masses) and
                     abs(mz - theoretical_masses[index + 1]) <= margin):
                 result_confs.append((mz, abund))
-        new_spectrum = Spectrum("", empty=True,
-                                label=experimental.label if
-                                hasattr(experimental, 'label') else None)
+        new_spectrum = Spectrum(label=experimental.label)
         new_spectrum.confs = result_confs
         return new_spectrum
 
-    def plot(self, show = True, profile=False, **plot_kwargs):
+    def plot(self, show = True, profile=False, linewidth=1, **plot_kwargs):
         import matplotlib.pyplot as plt
         if show:
             plt.clf()
         if profile:
-            plt.plot([x[0] for x in self.confs], [x[1] for x in self.confs], linestyle='-', label=self.label, **plot_kwargs)
+            plt.plot([x[0] for x in self.confs], [x[1] for x in self.confs],
+                     linestyle='-', label=self.label, **plot_kwargs)
         else:
-            plt.vlines([x[0] for x in self.confs], [0], [x[1] for x in self.confs], label = self.label, linewidth=1, **plot_kwargs)
+            plt.vlines([x[0] for x in self.confs], [0],
+                       [x[1] for x in self.confs], label = self.label,
+                       linewidth=linewidth, **plot_kwargs)
         if show:
             plt.show()
 
     @staticmethod
-    def plot_all(spectra, show=True, profile=False, cmap=None):
+    def plot_all(spectra, show=True, profile=False, cmap=None, **plot_kwargs):
         import matplotlib.pyplot as plt
         import matplotlib.cm as cm
-        import numpy as np
         if not cmap:
             colors = cm.rainbow(np.linspace(0, 1, len(spectra)))
             colors =  [[0, 0, 0, 0.8]] + [list(x[:3]) + [0.6] for x in colors]
@@ -497,18 +565,11 @@ class Spectrum:
                 colors = [[0, 0, 0, 0.8]] + [cmap(x, alpha=1) for x in range(len(spectra))]
             except:
                 colors = cmap
-        if show:
-            plt.clf()
         i = 0
         for spectre in spectra:
-            spectre.plot(show = False, profile=profile, color = colors[i])
+            spectre.plot(show = False, profile=profile, color = colors[i],
+                         **plot_kwargs)
             i += 1
         #plt.legend(loc=9, bbox_to_anchor=(0.5, -0.1), ncol=len(spectra))  # legend below plot
         plt.legend(loc=0, ncol=1)
         if show: plt.show()
-
-
-
-
-
-
