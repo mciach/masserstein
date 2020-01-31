@@ -57,13 +57,11 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
                 print("Global mass axis computed")
         n = len(global_mass_axis)
         k = len(thr_confs)
-        print(global_mass_axis)
 
         # Computing lengths of intervals between mz measurements (l_i variables)
         interval_lengths = [global_mass_axis[i+1] - global_mass_axis[i] for i in range(n-1)]
         if not quiet:
                 print("Interval lengths computed")
-                print(interval_lengths)
 
         # linear program:
         program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
