@@ -172,7 +172,9 @@ class Spectrum:
             cprob += prob
         ### TODO3: for profile spectra, set a margin of max. 5 zero intensities
         ### around any observed intensity to preserve peak shape
-        self.confs = [x for x in ret if x[1] > 1e-12]
+        ### For centroid spectra, remove all zero intensities.
+        #self.confs = [x for x in ret if x[1] > 1e-12]
+        self.confs = ret
 
     def set_confs(self, confs):
         self.confs = confs
@@ -261,7 +263,7 @@ class Spectrum:
         """
         xcoord, ycoord = zip(*self.confs)
         xcoord = map(lambda x: x*self.charge, xcoord)
-        xcoord = (round(x, nb_of_digits) for x in xcoord)
+        xcoord = (xcoord[0] + round(x-xcoord[0], nb_of_digits) for x in xcoord)
         xcoord = map(lambda x: x/self.charge, xcoord)
         self.confs = list(zip(xcoord, ycoord))
         self.sort_confs()
@@ -410,8 +412,8 @@ class Spectrum:
         """
         ### TODO: change max_width to be in ppm?
 
-        # Transpose the confs list to get a list of mz and a list of intensities:
-        mz, intsy = zip(*self.confs)
+        # Transpose the confs list to get an array of masses and an array of intensities:
+        mz, intsy = np.array(self.confs).T
         
         # Find the local maxima of intensity:
         peak_indices = argrelmax(intsy)[0]
