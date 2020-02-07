@@ -8,6 +8,7 @@ import re
 from collections import Counter
 import numpy.random as rd
 from .peptides import get_protein_formula
+from scipy.signal import argrelmax
 
 
 class Spectrum:
