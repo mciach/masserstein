@@ -385,7 +385,7 @@ class Spectrum:
         peaks = [x for x, p in zip(self.confs[1:-1], is_max) if p]
         return peaks
 
-    def centroid(mz, intsy, max_width, peak_height_fraction=0.5):
+    def centroid(self, max_width, peak_height_fraction=0.5):
         """Return confs of a centroided spectrum.
 
         The function identifies local maxima of intensity and integrates peaks in the regions
@@ -408,6 +408,9 @@ class Spectrum:
             (i.e. locations and heights of the local maxima of intensity.)
         """
         ### TODO: change max_width to be in ppm?
+
+        # Transpose the confs list to get a list of mz and a list of intensities:
+        mz, intsy = zip(*self.confs)
         
         # Find the local maxima of intensity:
         peak_indices = argrelmax(intsy)[0]
