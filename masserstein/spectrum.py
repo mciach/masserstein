@@ -47,7 +47,7 @@ class Spectrum:
             initialized spectrum. If not None, then `formula` needs be an empty
             string.
         label: str
-            An additional spectrum label.
+            An optional spectrum label.
         """
         ### TODO2: seprarate subclasses for centroid & profile spectra
         self.formula = formula
@@ -385,27 +385,35 @@ class Spectrum:
         peaks = [x for x, p in zip(self.confs[1:-1], is_max) if p]
         return peaks
 
-    def centroid(self, max_width, peak_height_fraction=0.5):
-        """
-        Returns a list of (mz, intensity) pairs for a centroided spectrum.
-        Peaks are detected as local maxima of intensity.
-        Next, each peak is integrated in a region above the peak_height_fraction
-        of the apex intensity.
-        If a peak is wider than max_width at the peak_height_fraction of the apex intensity,
-        it is skipped.
+    def centroid(mz, intsy, max_width, peak_height_fraction=0.5):
+        """Return confs of a centroided spectrum.
 
+        The function identifies local maxima of intensity and integrates peaks in the regions
+        delimited by peak_height_fraction of the apex intensity.
+        By default, for each peak the function will integrate the region delimited by the full width at half maximum.
+        If the detected region is wider than max_width, the peak is considered as noise and discarded.
+        Small values of max_width tend to miss peaks, while large ones increase computational complexity
+        and may lead to false positives.
+        
         Note that this function should only be applied to profile spectra - the result
         does not make sense for centroided spectrum.
         Applying a gaussian or Savitzky-Golay filter prior to peak picking
         is advised in order to avoid detection of noise.
-        """
-        # Find the local maxima of intensity:
-        diffs = [n[1]-p[1] for n,p in zip(self.confs[1:], self.confs[:-1])]
-        is_max = [nd <0 and pd > 0 for nd, pd in zip(diffs[1:], diffs[:-1])]
-        peak_indices = [i+1 for i, m in enumerate(is_max) if m]
 
-        mz=np.array([x[0] for x in self.confs])
-        intsy=np.array([x[1] for x in self.confs])
+        Returns
+        -----------------
+            A tuple of two peak lists that can be used to construct a new Spectrum object.
+            The first list contains configurations of centroids (i.e. centers of mass and areas of peaks).
+            The second list contains configurations of peak apices corresponding to the centroids
+            (i.e. locations and heights of the local maxima of intensity.)
+        """
+        ### TODO: change max_width to be in ppm?
+        
+        # Find the local maxima of intensity:
+        peak_indices = argrelmax(intsy)[0]
+
+        peak_mz = []
+        peak_intensity = []
         centroid_mz = []
         centroid_intensity = []
         max_dist = max_width/2.
@@ -413,23 +421,51 @@ class Spectrum:
         for p in peak_indices:
             current_mz = mz[p]
             current_intsy = intsy[p]
-            right_shift = 0
-            left_shift = 0
-            while p + right_shift < n-1 and mz[p+right_shift] - mz[p] < max_dist and intsy[p+right_shift] > peak_height_fraction*current_intsy:
+            # Compute peak centroids:
+            target_intsy = peak_height_fraction*current_intsy
+            right_shift = 1
+            left_shift = 1
+            # Get the mz points bounding the peak fragment to integrate.
+            # First, go to the right from the detected apex until one of the four conditions are met:
+            # 1. we exceed the mz range of the spectrum
+            # 2. we exceed the maximum distance from the apex given by max_dist
+            # 3. the intensity exceeds the apex intensity (meaning that we've reached another peak) 
+            # 4. we go below the threshold intensity (the desired stopping condition)
+            # Note: in step 3, an alternative is to check if the intensity simply starts to increase w.r.t. the previous inspected point.
+            # Such an approach may give less false positive peaks, but is very sensitive to electronic noise and to overlapping peaks.
+            # When we check if the intensity has not exceeded the apex intensity, and we encounter a cluster of overlapping peaks,
+            # then we will effectively consider the highest one as the true apex of the cluster and integrate the whole cluster only once.
+            while p + right_shift < n-1 and mz[p+right_shift] - mz[p] < max_dist and intsy[p+right_shift] <= current_intsy and intsy[p+right_shift] > target_intsy:
                 right_shift += 1
-            if intsy[p+right_shift] > peak_height_fraction*current_intsy:
+            if intsy[p+right_shift] > target_intsy:
                 continue
-            while p - left_shift > 1 and mz[p] - mz[p-left_shift] < max_dist and intsy[p-left_shift] > peak_height_fraction*current_intsy:
+            while p - left_shift > 1 and mz[p] - mz[p-left_shift] < max_dist and intsy[p-left_shift] <= current_intsy and intsy[p-left_shift] > target_intsy:
                 left_shift += 1
-            if intsy[p-left_shift] > peak_height_fraction*current_intsy:
+            if intsy[p-left_shift] > target_intsy:
                 continue
-            x, y = mz[(p-left_shift):(p+right_shift+1)], intsy[(p-left_shift):(p+right_shift+1)]
+            # Get the mz value actually corresponding to peak_height_fraction*current_intsy:
+            lx1, lx2 = mz[p-left_shift], mz[p-left_shift+1]  # x coordinates of points around left mz value we're looking for
+            ly1, ly2 = intsy[p-left_shift], intsy[p-left_shift+1]
+            assert ly1 <= target_intsy <= ly2
+            rx1, rx2 = mz[p+right_shift-1], mz[p+right_shift] 
+            ry1, ry2 = intsy[p+right_shift-1], intsy[p+right_shift]
+            assert ry1 >= target_intsy >= ry2
+            lx = (target_intsy-ly1)*(lx2-lx1)/(ly2-ly1) + lx1
+            assert lx1 <= lx <= lx2
+            rx = (target_intsy-ry1)*(rx2-rx1)/(ry2-ry1) + rx1
+            assert rx1 <= rx <= rx2
+            x = np.hstack((lx, mz[(p-left_shift+1):(p+right_shift)], rx))
+            y = np.hstack((target_intsy, intsy[(p-left_shift+1):(p+right_shift)], target_intsy))
+            # Integrate the area:
             cint = np.trapz(y, x)
             cmz = np.trapz(y*x, x)/cint
             if cmz not in centroid_mz:  # intensity errors may introduce artificial peaks
                 centroid_mz.append(cmz)
                 centroid_intensity.append(cint)
-        return(list(zip(centroid_mz, centroid_intensity)))
+                # Store the apex data:
+                peak_mz.append(current_mz)
+                peak_intensity.append(current_intsy)
+        return(list(zip(centroid_mz, centroid_intensity)), list(zip(peak_mz, peak_intensity)))
 
 
     def fuzzify_peaks(self, sd, step):
