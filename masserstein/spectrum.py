@@ -587,7 +587,7 @@ class Spectrum:
             plt.clf()
         if profile:
             plt.plot([x[0] for x in self.confs], [x[1] for x in self.confs],
-                     linestyle='-', label=self.label, **plot_kwargs)
+                     linestyle='-', linewidth=linewidth, label=self.label, **plot_kwargs)
         else:
             plt.vlines([x[0] for x in self.confs], [0],
                        [x[1] for x in self.confs], label = self.label,
