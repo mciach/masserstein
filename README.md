@@ -1,4 +1,4 @@
-# Wasserstein MS
+# Introduction
 This repository contains software tools which allow to compare spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
 
 The tools are distributed as a Python3 package called `masserstein`. Basic functionality is also available as a set of commandline applications: `WSDistance` to compute the Wasserstein distance and `WSDeconv` to estimate proportions. 
