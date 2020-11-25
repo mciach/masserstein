@@ -7,9 +7,8 @@ import heapq
 import re
 from collections import Counter
 import numpy.random as rd
-from .peptides import get_protein_formula
 from scipy.signal import argrelmax
-
+from .peptides import get_protein_formula
 
 class Spectrum:
     def __init__(self, formula='', threshold=0.001, total_prob=None,
@@ -158,9 +157,15 @@ class Spectrum:
         return max(self.confs, key=lambda x: x[1])
 
     def sort_confs(self):
+        """
+        Sorts configurations by their mass.
+        """
         self.confs.sort(key = lambda x: x[0])
 
     def merge_confs(self):
+        """
+        Merges configurations with an identical mass, summing their intensities.
+        """
         cmass = self.confs[0][0]
         cprob = 0.0
         ret = []
@@ -217,10 +222,16 @@ class Spectrum:
         return ret
 
     def normalize(self, target_value = 1.0):
+        """
+        Normalize the intensity values so that they sum up to the target value.
+        """
         x = target_value/math.fsum(v[1] for v in self.confs)
         self.confs = [(v[0], v[1]*x) for v in self.confs]
 
     def WSDistanceMoves(self, other):
+        """
+        Return the optimal transport plan between self and other.
+        """
         try:
             ii = 0
             leftoverprob = other.confs[0][1]
@@ -473,6 +484,54 @@ class Spectrum:
                 peak_intensity.append(current_intsy)
         return(list(zip(centroid_mz, centroid_intensity)), list(zip(peak_mz, peak_intensity)))
 
+    def resample(self, target_mz, mz_distance_threshold=0.05):
+        """
+        Returns a resampled spectrum with intensity values approximated
+        at points given by a sorted iterable target_mz.
+        The approximation is performed by a piecewise linear interpolation
+        of the spectrum intensities. The spectrum needs to be in profile mode 
+        in order for this procedure to work properly.
+        The spectrum is interpolated only if two target mz values closest to a 
+        given target mz are closer than the specified threshold
+        This is done in order to interpolate the intensity only within peaks, not between them. 
+        If the surrounding mz values are further away than the threshold,
+        it is assumed that the given target mz corresponds to the background and
+        there is no intensity at that point. 
+        A rule-of-thumb is to set threshold as twice the distance between
+        neighboring m/z measurements.
+        Large thresholds may lead to non-zero resampled intensity in the background,
+        low thresholds might cause bad interpolation due to missing intensity values.
+        """
+        mz = [mz for mz, intsy in self.confs]
+        intsy = [intsy for mz, intsy in self.confs]
+        x = target_mz[0]
+        for m in target_mz:
+            assert m >= x, "The target_mz list is not sorted!"
+            x = m
+        lenx = len(target_mz)
+        lent = len(mz)
+        qi = 0  # query (x) index
+        ti = 0  # target index - the first index s.t. mz[ti] >= x[qi]
+        y = [0.]*lenx  # resampled intensities
+        y0, y1 = intsy[0], intsy[0]  # intensities of target spectrum around the point target_mz[qi]
+        x0, x1 = mz[0], mz[0]  # mz around the point target_mz[qi]
+        # before mz starts, the intensity is zero:
+        while target_mz[qi] < mz[0]:
+            qi += 1
+        # interpolating:
+        while ti < lent-1:
+            ti += 1
+            y0 = y1
+            y1 = intsy[ti]
+            x0 = x1
+            x1 = mz[ti]
+            while qi < lenx and target_mz[qi] <= mz[ti]:
+                # note: maybe in this case set one of the values to zero to get a better interpolation of edges
+                if x1-x0 < mz_distance_threshold:  
+                    y[qi] = y1 + (target_mz[qi]-x1)*(y0-y1)/(x0-x1)
+                qi += 1
+        return Spectrum(confs = list(zip(target_mz, y)))
+
 
     def fuzzify_peaks(self, sd, step):
         """
@@ -582,9 +641,11 @@ class Spectrum:
         return new_spectrum
 
     def plot(self, show = True, profile=False, linewidth=1, **plot_kwargs):
+        """
+        Plots the spectrum.
+        The keyword argument show is retained for backwards compatibility.
+        """
         import matplotlib.pyplot as plt
-        if show:
-            plt.clf()
         if profile:
             plt.plot([x[0] for x in self.confs], [x[1] for x in self.confs],
                      linestyle='-', linewidth=linewidth, label=self.label, **plot_kwargs)
@@ -597,6 +658,9 @@ class Spectrum:
 
     @staticmethod
     def plot_all(spectra, show=True, profile=False, cmap=None, **plot_kwargs):
+        """
+        Shows the supplied list of spectra on a single plot. 
+        """
         import matplotlib.pyplot as plt
         import matplotlib.cm as cm
         if not cmap:
@@ -609,9 +673,37 @@ class Spectrum:
                 colors = cmap
         i = 0
         for spectre in spectra:
-            spectre.plot(show = False, profile=profile, color = colors[i],
+            spectre.plot(show=False, profile=profile, color = colors[i],
                          **plot_kwargs)
             i += 1
         #plt.legend(loc=9, bbox_to_anchor=(0.5, -0.1), ncol=len(spectra))  # legend below plot
         plt.legend(loc=0, ncol=1)
-        if show: plt.show()
+        if show:
+            plt.show()
+
+
+if __name__=="__main__":
+    import matplotlib.pyplot as plt
+    S = Spectrum(formula="C2H5OH", threshold=0.)
+    S.plot()
+    S.fuzzify_peaks(0.1, 0.01)
+    S.plot(profile=True)
+    
+    target_mz = np.linspace(45, 56, num=100)
+    R = S.resample(target_mz)
+    plt.subplot(221)
+    S.plot(show=False, profile=True)
+    plt.subplot(222)
+    R.plot(show=False, profile=True)
+    plt.subplot(223)
+    S.plot(show=False, profile=True)
+    plt.plot([mz for mz, intsy in S.confs],
+                   [intsy for mz, intsy in S.confs],
+                   'r.')
+    plt.subplot(224)
+    R.plot(show=False, profile=True)
+    plt.plot([mz for mz, intsy in R.confs],
+                   [intsy for mz, intsy in R.confs],
+                   'r.')
+    plt.tight_layout()
+    plt.show()
