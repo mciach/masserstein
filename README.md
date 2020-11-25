@@ -63,6 +63,5 @@ WSDeconv examples/protein_spectrum.txt examples/protein_molecule_list.txt Protei
 
 A more advanced functionality can be accessed using the `masserstein` package in the Python programming language. The package includes functions to create theoretical or experimental spectrum objects and a minimalistic spectrum processing toolbox which allows, among others, to smooth and peak-pick the spectra, as well as to distort them by simulating realistic noise. This package can be used to estimate proportions using experimentally measured query spectra instead of the ones simulated by IsoSpec.
 
-Examples of use of the package functions are shown in the `generate_test_data.py` file, which was used to generate the protein example datasets supplied with the package.
-
+Examples of use of the package functions are shown in the tutorials available on this repository.  
 
