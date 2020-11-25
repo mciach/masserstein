@@ -3,8 +3,8 @@ from time import time
 from masserstein import Spectrum
 import pulp as lp
 from warnings import warn
-from decimal import Decimal
 import tempfile
+
 
 
 
@@ -32,96 +32,94 @@ def intensity_generator(confs, mzaxis):
 
 
 def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
-    """
-    Different formulation, maybe faster
-    exp_sp: experimental spectrum
-    thr_sp: list of theoretical spectra
-    penalty: denoising penalty
-    """
-    start = time()
-    exp_confs = exp_sp.confs.copy()
-    thr_confs = [thr_sp.confs.copy() for thr_sp in thr_sps]
+        """
+        Different formulation, maybe faster
+        exp_sp: experimental spectrum
+        thr_sp: list of theoretical spectra
+        penalty: denoising penalty
+        """
+        start = time()
+        exp_confs = exp_sp.confs.copy()
+        thr_confs = [thr_sp.confs.copy() for thr_sp in thr_sps]
 
-    multiplier = 1e04  # to avoid catastrophic cancellations
-    penalty *= multiplier
-    # Normalization check:
-    assert np.isclose(sum(x[1] for x in exp_confs) , 1), 'Experimental spectrum not normalized'
-    for i, thrcnf in enumerate(thr_confs):
-        assert np.isclose(sum(x[1] for x in thrcnf), 1), 'Theoretical spectrum %i not normalized' % i
-    
-    # Computing a common mass axis for all spectra
-    exp_confs = [(multiplier*round(m, 6), i) for m, i in exp_confs]
-    thr_confs = [[(multiplier*round(m, 6), i) for m, i in cfs] for cfs in thr_confs]
-    global_mass_axis = set(x[0] for x in exp_confs)
-    global_mass_axis.update(x[0] for s in thr_confs for x in s)
-    global_mass_axis = sorted(global_mass_axis)
-    if not quiet:
-        print("Global mass axis computed")
-    n = len(global_mass_axis)
-    k = len(thr_confs)
+        # Normalization check:
+        assert np.isclose(sum(x[1] for x in exp_confs) , 1), 'Experimental spectrum not normalized'
+        for i, thrcnf in enumerate(thr_confs):
+                assert np.isclose(sum(x[1] for x in thrcnf), 1), 'Theoretical spectrum %i not normalized' % i
 
-    # Computing lengths of intervals between mz measurements (l_i variables)
-    interval_lengths = [global_mass_axis[i+1] - global_mass_axis[i] for i in range(n-1)]
-    if not quiet:
-        print("Interval lengths computed")
-        
-    # linear program:
-    program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
-    if not quiet:
-        print("Linear program initialized")
-    # variables:
-    lpVars = []
-    for i in range(n):
-        lpVars.append(lp.LpVariable('Z%i' % (i+1), None, penalty, lp.LpContinuous))
-##        # in case one would like to explicitly forbid non-experimental abyss:
-##        if V[i] > 0:
-##            lpVars.append(lp.LpVariable('W%i' % (i+1), None, penalty, lp.LpContinuous))
-##        else:
-##            lpVars.append(lp.LpVariable('W%i' % (i+1), None, None, lp.LpContinuous))
-    if not quiet:
-        print("Variables created")
-    # objective function:
-    exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-    program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars)), 'Dual objective'
-    # constraints:
-    for j in range(k):
-        thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars) if v > 0.) <= 0, 'P%i' % (j+1)
-    if not quiet:
-        print('tsk tsk')
-##    for i in range(n-1):
-##        program += lpVars[i]-lpVars[i+1] <= interval_lengths[i], 'EpsPlus %i' % (i+1)
-##        program += lpVars[i] - lpVars[i+1] >=  -interval_lengths[i], 'EpsMinus %i' % (i+1)
-    for i in range(n-1):
-        program +=  lpVars[i] - lpVars[i+1]  <=  interval_lengths[i], 'EpsPlus %i' % (i+1)
-        program +=  lpVars[i] - lpVars[i+1]  >= -interval_lengths[i], 'EpsMinus %i' % (i+1)
-    if not quiet:
-        print("Constraints written")
-    # program.writeLP('WassersteinL1.lp')
-    if not quiet:
-        print("Starting solver")
-    program.solve()
-    end = time()
-    if not quiet:
-        print("Solver finished.")
-        print("Status:", lp.LpStatus[program.status])
-        print("Optimal value:", lp.value(program.objective)/multiplier)
-        print("Time:", end - start)
-    constraints = program.constraints
-    probs = [round(constraints['P%i' % i].pi, 12) for i in range(1, k+1)]
-    exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
-    # 'if' clause below is to restrict returned abyss to experimental confs
-    abyss = [round(x.dj, 12) for i, x in enumerate(lpVars) if exp_vec[i] > 0.]
-    # note: accounting for number of summands in checking of result correctness,
-    # because summation of many small numbers introduces numerical errors
-    if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
-        warn("""In dualdeconv2:
-Proportions of signal and noise sum to %f instead of 1.
-This may indicate improper results.
-Please check the deconvolution results and consider reporting this warning to the authors.
-                            """ % (sum(probs)+sum(abyss)))
+        # Computing a common mass axis for all spectra
+        exp_confs = [(m, i) for m, i in exp_confs]
+        thr_confs = [[(m, i) for m, i in cfs] for cfs in thr_confs]
+        global_mass_axis = set(x[0] for x in exp_confs)
+        global_mass_axis.update(x[0] for s in thr_confs for x in s)
+        global_mass_axis = sorted(global_mass_axis)
+        if not quiet:
+                print("Global mass axis computed")
+        n = len(global_mass_axis)
+        k = len(thr_confs)
 
-    return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective), 'status': program.status}
+        # Computing lengths of intervals between mz measurements (l_i variables)
+        interval_lengths = [global_mass_axis[i+1] - global_mass_axis[i] for i in range(n-1)]
+        if not quiet:
+                print("Interval lengths computed")
+
+        # linear program:
+        program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
+        if not quiet:
+                print("Linear program initialized")
+        # variables:
+        lpVars = []
+        for i in range(n):
+                lpVars.append(lp.LpVariable('Z%i' % (i+1), None, penalty, lp.LpContinuous))
+        ##        # in case one would like to explicitly forbid non-experimental abyss:
+        ##        if V[i] > 0:
+        ##            lpVars.append(lp.LpVariable('W%i' % (i+1), None, penalty, lp.LpContinuous))
+        ##        else:
+        ##            lpVars.append(lp.LpVariable('W%i' % (i+1), None, None, lp.LpContinuous))
+        if not quiet:
+                print("Variables created")
+        # objective function:
+        exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars)), 'Dual objective'
+        # constraints:
+        for j in range(k):
+                thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars) if v > 0.) <= 0, 'P%i' % (j+1)
+        if not quiet:
+                print('tsk tsk')
+        ##    for i in range(n-1):
+        ##        program += lpVars[i]-lpVars[i+1] <= interval_lengths[i], 'EpsPlus %i' % (i+1)
+        ##        program += lpVars[i] - lpVars[i+1] >=  -interval_lengths[i], 'EpsMinus %i' % (i+1)
+        for i in range(n-1):
+                program +=  lpVars[i] - lpVars[i+1]  <=  interval_lengths[i], 'EpsPlus %i' % (i+1)
+                program +=  lpVars[i] - lpVars[i+1]  >= -interval_lengths[i], 'EpsMinus %i' % (i+1)
+        if not quiet:
+                print("Constraints written")
+        #program.writeLP('WassersteinL1.lp')
+        if not quiet:
+                print("Starting solver")
+        program.solve()
+        end = time()
+        if not quiet:
+                print("Solver finished.")
+                print("Status:", lp.LpStatus[program.status])
+                print("Optimal value:", lp.value(program.objective))
+                print("Time:", end - start)
+        constraints = program.constraints
+        probs = [round(constraints['P%i' % i].pi, 12) for i in range(1, k+1)]
+        exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
+        # 'if' clause below is to restrict returned abyss to experimental confs
+        abyss = [round(x.dj, 12) for i, x in enumerate(lpVars) if exp_vec[i] > 0.]
+        # note: accounting for number of summands in checking of result correctness,
+        # because summation of many small numbers introduces numerical errors
+        if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
+                warn("""In dualdeconv2:
+                Proportions of signal and noise sum to %f instead of 1.
+                This may indicate improper results.
+                Please check the deconvolution results and consider reporting this warning to the authors.
+                                    """ % (sum(probs)+sum(abyss)))
+
+        return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective), 'status': program.status}
 
 
 def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False):
@@ -305,6 +303,7 @@ Please check the deconvolution results and consider reporting this warning to th
 
 
 if __name__=="__main__":
+
     exper = [(1., 1/6.), (2., 3/6.), (3., 2/6.)]
     thr1 = [(1., 1/2.), (2.,1/2.)]
     thr2 = [(2., 1/2.), (3., 1/2.)]
@@ -337,7 +336,22 @@ if __name__=="__main__":
     print('sum:', sum(sol2['probs']+sol2['trash']))
     test = estimate_proportions(experSp, thrSp, MTD=.2, MMD=0.21)
 
+    # Very similar masses can introduce errors due to catastrophical cancellations
     chunk_confs = [[1. + 1e-06, 0.6], [1.4, 0.4]]
+    query_confs = [(1.00000, 0.6), (1.5, 0.4)]
+    badSp = Spectrum('', empty=True)
+    badSp.set_confs(chunk_confs)
+    badSp.normalize()
+
+    qSp = Spectrum('', empty=True)
+    qSp.set_confs(query_confs)
+    qSp.normalize()
+    dualdeconv2(badSp, [qSp], 0.003, quiet=False)
+
+    # Solution: use mpf library
+    from mpmath import mpf, mp
+    mp.dps = 25
+    chunk_confs = [[mpf(1.) + mpf(1e-06), 0.6], [1.4, 0.4]]
     query_confs = [(1.00000, 0.6), (1.5, 0.4)]
     badSp = Spectrum('', empty=True)
     badSp.set_confs(chunk_confs)
