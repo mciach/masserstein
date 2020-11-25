@@ -294,9 +294,6 @@ class Spectrum:
         to be normalized. Accordingly, the method does not normalize the intensity afterwards!
         noise_fraction controls the amount of noise signal in the spectrum.
         nb_of_noise_peaks controls the number of peaks added.
-
-        Return: list
-            A boolean list indicating if a given peak corresponds to noise
         """
         span = min(x[0] for x in self.confs), max(x[0] for x in self.confs)
         span_increase = 1.2  # increase the mass range by a factor of 1.2
@@ -310,7 +307,6 @@ class Spectrum:
         self.confs += noise
         self.sort_confs()
         self.merge_confs()
-        return [True if mz in noisex else False for mz in [x[0] for x in self.confs]]
 
     def add_gaussian_noise(self, sd):
         """
