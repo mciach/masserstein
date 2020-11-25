@@ -52,8 +52,7 @@ for symbol, formula in aminoacids.items():
     daminoacids[symbol] = C
 
 def get_protein_counter(seq, add_water=True):
-    cnts = [(k, sum(char == k for char in seq)) for k in aminoacids]
-    cnts = Counter(dict(k for k in cnts if k[1] > 0))
+    cnts = Counter({k : v for k, v in Counter(seq).items() if v > 0 and k in aminoacids})
     return aacnt_to_elecnt(cnts, add_water=add_water)
 
 def get_protein_formula(seq, add_water=True):
@@ -61,10 +60,7 @@ def get_protein_formula(seq, add_water=True):
     # Apply modifications
     for mod_desc, mod_val in modifications:
         mod_cnt = seq.count(mod_desc)
-        for _ in range(mod_cnt):
-            # Oh yeah, Counter supports + but does not support *.
-            # :-)
-            c += mod_val
+        c += {k : v*mod_cnt for k, v in mod_val.items()}
     return ''.join(sym+str(count) for sym,count in sorted(c.items()))
 
 def aacnt_to_elecnt(cnts, add_water = True):
