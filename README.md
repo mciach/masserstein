@@ -1,9 +1,9 @@
-# Wasserstein MS
+# Contents of this repository
 This repository contains software tools which allow to compare spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
 
 The tools are distributed as a Python3 package called `masserstein`. Basic functionality is also available as a set of commandline applications: `WSDistance` to compute the Wasserstein distance and `WSDeconv` to estimate proportions. 
 
-If you encounter any difficulties during installation or usage of these programs, or if you have any suggestions regarding their functionality, please send an email to m_ciach@student.uw.edu.pl. 
+If you encounter any difficulties during installation or usage of these programs, or if you have any suggestions regarding their functionality, please post a GitHub issue or send an email to m.ciach@mimuw.edu.pl. 
 
 # Installation
 
@@ -63,6 +63,13 @@ WSDeconv examples/protein_spectrum.txt examples/protein_molecule_list.txt Protei
 
 A more advanced functionality can be accessed using the `masserstein` package in the Python programming language. The package includes functions to create theoretical or experimental spectrum objects and a minimalistic spectrum processing toolbox which allows, among others, to smooth and peak-pick the spectra, as well as to distort them by simulating realistic noise. This package can be used to estimate proportions using experimentally measured query spectra instead of the ones simulated by IsoSpec.
 
-Examples of use of the package functions are shown in the `generate_test_data.py` file, which was used to generate the protein example datasets supplied with the package.
+Examples of use of the package functions are shown in the tutorials available on this repository.  
+
+
+# Citing 
+
+If you use tools from this package, please cite the following article:  
+
+Ciach, M. A., Miasojedow, B., Skoraczynski, G., Majewski, S., Startek, M., Valkenborg, D., & Gambin, A. (2020). Masserstein: linear regression of mass spectra by optimal transport. Rapid Communications in Mass Spectrometry.
 
 

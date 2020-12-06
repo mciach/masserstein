@@ -91,8 +91,8 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         ##        program += lpVars[i]-lpVars[i+1] <= interval_lengths[i], 'EpsPlus %i' % (i+1)
         ##        program += lpVars[i] - lpVars[i+1] >=  -interval_lengths[i], 'EpsMinus %i' % (i+1)
         for i in range(n-1):
-                program +=  lpVars[i] - lpVars[i+1]  <=  interval_lengths[i], 'EpsPlus %i' % (i+1)
-                program +=  lpVars[i] - lpVars[i+1]  >= -interval_lengths[i], 'EpsMinus %i' % (i+1)
+                program +=  lpVars[i] - lpVars[i+1]  <=  interval_lengths[i], 'EpsPlus_%i' % (i+1)
+                program +=  lpVars[i] - lpVars[i+1]  >= -interval_lengths[i], 'EpsMinus_%i' % (i+1)
         if not quiet:
                 print("Constraints written")
         #program.writeLP('WassersteinL1.lp')
