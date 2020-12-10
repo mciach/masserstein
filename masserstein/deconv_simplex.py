@@ -5,7 +5,7 @@ import pulp as lp
 from warnings import warn
 import tempfile
 from tqdm import tqdm
-
+from pulp.apis import LpSolverDefault
 
 
 
@@ -99,7 +99,8 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         #program.writeLP('WassersteinL1.lp')
         if not quiet:
                 print("Starting solver")
-        program.solve()
+        LpSolverDefault.msg = not quiet
+        program.solve(solver = LpSolverDefault)
         end = time()
         if not quiet:
                 print("Solver finished.")
