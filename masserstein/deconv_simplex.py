@@ -167,9 +167,9 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         explained by the supplied formulas. The intensities correspond
         to the m/z values of experimental spectrum.
     """
-    def progr_bar(x, desc = None):
+    def progr_bar(x, **kwargs):
         if progress:
-            return tqdm(x, desc = desc)
+            return tqdm(x, **kwargs)
         else:
             return x
     try:
@@ -260,7 +260,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         print("Ion currents in chunks:", chunk_TICs)
 
     # Deconvolving chunks:
-    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc = "Deconvolving chunks"):
+    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", total=len(exp_conf_chunks)):
         if verbose:
             print("Deconvolving chunk %i" % current_chunk_ID)
         if chunk_TICs[current_chunk_ID] < 1e-16:
