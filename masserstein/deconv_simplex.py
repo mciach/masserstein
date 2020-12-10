@@ -4,6 +4,7 @@ from masserstein import Spectrum
 import pulp as lp
 from warnings import warn
 import tempfile
+from tqdm import tqdm
 
 
 
@@ -167,8 +168,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
     """
     def progr_bar(x, desc = None):
         if progress:
-            import tqdm
-            return tqdm.tqdm(x, desc = desc)
+            return tqdm(x, desc = desc)
         else:
             return x
     try:
