@@ -80,7 +80,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
                 print("Variables created")
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars)), 'Dual objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars)), 'Dual_objective'
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
@@ -170,6 +170,12 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         raise
     assert abs(sum(x[1] for x in exp_confs) - 1.) < 1e-08, 'The experimental spectrum is not normalized.'
     assert all(x[0] >= 0. for x in exp_confs), 'Found experimental peaks with negative masses!'
+    if any(x[1] < 0 for x in exp_confs):
+        raise ValueError("""
+        The experimental spectrum cannot contain negative intensities. 
+        Please remove them using e.g. the Spectrum.trim_negative_intensities() method.
+        """
+                           
     vortex = [0.]*len(exp_confs)  # unxplained signal
     k = len(query)
     proportions = [0.]*k
