@@ -4,7 +4,8 @@ from masserstein import Spectrum
 import pulp as lp
 from warnings import warn
 import tempfile
-
+from tqdm import tqdm
+from pulp.apis import LpSolverDefault
 
 
 
@@ -98,7 +99,8 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         #program.writeLP('WassersteinL1.lp')
         if not quiet:
                 print("Starting solver")
-        program.solve()
+        LpSolverDefault.msg = not quiet
+        program.solve(solver = LpSolverDefault)
         end = time()
         if not quiet:
                 print("Solver finished.")
@@ -122,7 +124,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective), 'status': program.status}
 
 
-def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False):
+def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False, progress=True):
     """
     Returns estimated proportions of molecules from query in spectrum.
     Performs initial filtering of formulas and experimental spectrum to speed
@@ -156,6 +158,8 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         given by this parameter.
     verbose: bool
         Print diagnistic messages?
+    progress: bool
+        Whether to display progress bars during work.
     _____
     Returns: dict
         A dictionary with entry 'proportions', storing a list of proportions of query spectra,
@@ -163,6 +167,11 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         explained by the supplied formulas. The intensities correspond
         to the m/z values of experimental spectrum.
     """
+    def progr_bar(x, **kwargs):
+        if progress:
+            return tqdm(x, **kwargs)
+        else:
+            return x
     try:
         exp_confs = spectrum.confs
     except:
@@ -181,7 +190,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
     # Initial filtering of formulas
     envelope_bounds = []
     filtered = []
-    for i in range(k):
+    for i in progr_bar(range(k), desc = "Initial filtering of formulas"):
         s = query[i]
         mode = s.get_modal_peak()[0]
         mn = s.confs[0][0]
@@ -213,7 +222,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         chunkIDs[sp_id] = -1
         first_present += 1
     prev_mn, prev_mx, prev_id = envelope_bounds[first_present]
-    for i in range(first_present, k):
+    for i in progr_bar(range(first_present, k), desc = "Computing chunks"):
         mn, mx, sp_id = envelope_bounds[i]
         if mn - prev_mx > 2*MTD:
             current_chunk += 1
@@ -233,7 +242,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
     current_chunk = 0
     matching_confs = []  # experimental confs matching current chunk
     cur_bound = chunk_bounds[current_chunk]
-    for conf_id, cur_conf in enumerate(exp_confs):
+    for conf_id, cur_conf in progr_bar(enumerate(exp_confs), desc = "Splitting the experimental spectrum into chunks"):
         while cur_bound[1] < cur_conf[0] and current_chunk < nb_of_chunks-1:
             exp_conf_chunks.append(matching_confs)
             matching_confs = []
@@ -251,7 +260,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         print("Ion currents in chunks:", chunk_TICs)
 
     # Deconvolving chunks:
-    for current_chunk_ID, conf_IDs in enumerate(exp_conf_chunks):
+    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", total=len(exp_conf_chunks)):
         if verbose:
             print("Deconvolving chunk %i" % current_chunk_ID)
         if chunk_TICs[current_chunk_ID] < 1e-16:
