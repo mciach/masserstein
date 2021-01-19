@@ -553,22 +553,22 @@ class Spectrum:
         Applies a gaussian filter to the peaks, effectively broadening them
         and simulating low resolution. Works in place, modifying self.
         The parameter step gives the distance between samples in m/z axis.
-        Note that after the filtering, the area below curve is equal to 1,
-        instead of the sum of 'peak' intensities!
+        After the filtering, the area below curve (not the sum of intensities!)
+        is equal to the sum of the input peak intensities.
         """
         new_mass = np.arange(self.confs[0][0] - 4*sd, self.confs[-1][0] + 4*sd, step)
-        new_intensity = np.zeros(len(new_mass))
-        lb = new_mass[0]
-        for x, y in self.confs:
-            xrnb = int((x-lb)//step)  # x's index in new_mass
-            xr = lb + step*xrnb
-            lnb = int((xr-x+4*sd)//step)   # nb of steps left of x to add gauss
-            xlb = xr - step*lnb
-            xrb = xr + step*lnb
-            xv = np.array([xlb + i*step for i in range(2*lnb + 2)])
-            nv = y*norm.pdf(xv, x, sd)
-            new_intensity[(xrnb-lnb):(xrnb+lnb+2)] += nv
-        self.confs = [(x, y) for x, y in zip(new_mass, new_intensity)]
+        A = new_mass[:,np.newaxis] - np.array([m for m,i in self.confs])
+        # we don't need to evaluate gaussians to far from their mean,
+        # from our perspective 4 standard deviations from the mean is the same
+        # as the infinity; this allows to avoid overflow as well:
+        A[np.abs(A) > 4*sd] = np.inf  
+        A **= 2
+        A /= (-2*sd**2)
+        A = np.exp(A)
+        new_intensity = A @ np.array([i for m,i in self.confs])  # matrix multiplication
+        new_intensity /= (np.sqrt(2*np.pi)*sd)
+        self.set_confs(list(zip(new_mass, new_intensity)))
+        
 
     def cut_smallest_peaks(self, removed_proportion=0.001):
         """
@@ -699,10 +699,19 @@ class Spectrum:
 
 if __name__=="__main__":
     import matplotlib.pyplot as plt
-    S = Spectrum(formula="C2H5OH", threshold=0.)
+    from copy import deepcopy
+    S = Spectrum(formula="C2H5OH", threshold=0.01)
+    
+    S.add_chemical_noise(4, 0.2)
     S.plot()
-    S.fuzzify_peaks(0.1, 0.01)
-    S.plot(profile=True)
+
+    sd = 0.01
+    C = deepcopy(S)
+    C = C*(np.sqrt(2*np.pi)*sd)**-1
+    S.fuzzify_peaks(0.01, 0.0001)
+    S.plot(profile=True, show=False)
+    C.plot(show=False)
+    plt.show()
     
     target_mz = np.linspace(45, 56, num=100)
     R = S.resample(target_mz)
