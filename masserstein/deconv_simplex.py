@@ -6,6 +6,7 @@ from warnings import warn
 import tempfile
 from tqdm import tqdm
 from pulp.apis import LpSolverDefault
+from masserstein import misc
 
 
 
@@ -201,8 +202,9 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         mode = s.get_modal_peak()[0]
         mn = s.confs[0][0]
         mx = s.confs[-1][0]
-        matching_current = MDC==0. or sum(x[1] for x in exp_confs if x[0] >= mn - MTD and x[0] <= mx + MTD) >= MDC
-        matching_mode = MMD==-1 or min(abs(mode - x[0]) for x in exp_confs) <= MMD
+        matching_current = MDC==0. or sum(x[1] for x in misc.extract_range(exp_confs, mn - MTD, mx + MTD)) >= MDC
+        matching_mode = MMD==-1 or abs(misc.closest(exp_confs, mode)[0] - mode) <= MMD
+
         if matching_mode and matching_current:
             envelope_bounds.append((mn, mx, i))
         else:
