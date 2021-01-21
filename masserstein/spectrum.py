@@ -13,7 +13,7 @@ from warnings import warn
 
 class Spectrum:
     def __init__(self, formula='', threshold=0.001, total_prob=None,
-                 charge=1, adduct=None, confs=None, label=None, **other):
+                 charge=1, adduct=None, confs=None, label=None, isospec=None, **other):
         """Initialize a Spectrum class.
 
         Initialization can be done either by simulating a spectrum of an ion
@@ -49,6 +49,9 @@ class Spectrum:
             string.
         label: str
             An optional spectrum label.
+        isospec: IsoSpecPy.IsoDistribution
+            An IsoSpecPy object representing the spectrum. This method takes
+            ownership of the passed object, and it should not be used any further.
         """
         ### TODO2: seprarate subclasses for centroid & profile spectra
         self.formula = formula
@@ -70,9 +73,27 @@ class Spectrum:
             self.set_confs(
                 self.confs_from_formula(
                     formula, threshold, total_prob, charge, adduct))
+        elif isospec is not None:
+            self.set_isospec(isospec)
         else:
             self.empty = True
             self.confs = []
+
+    @property
+    def confs(self):
+        return list(zip(self._masses, self._probs))
+
+    @confs.setter
+    def confs(self, new_confs):
+        self.set_isospec(IsoSpecPy.IsoDistribution(masses = [nc[0] for nc in new_confs], probs = [nc[1] for nc in new_confs]))
+        #raise Exception("Changing of the spectrum through the spectrum.confs accessor is hard-deprecated")
+
+    def set_isospec(self, iso_obj):
+        self._isospec = iso_obj
+        self._isospec.sort_by_mass()
+        self._isospec.normalize()
+        self._masses = self._isospec.np_masses()
+        self._probs = self._isospec.np_probs()
 
     @staticmethod
     def confs_from_formula(formula, threshold=0.001, total_prob=None,
@@ -140,8 +161,7 @@ class Spectrum:
         """
         Returns the average mass.
         """
-        norm = float(sum(x[1] for x in self.confs))
-        return sum(x[0]*x[1]/norm for x in self.confs)
+        return self._isospec.empiric_average_mass()
 
     # def copy(self):
     #     isospec = self.isospec
@@ -155,19 +175,20 @@ class Spectrum:
         """
         Returns the peak with the highest intensity.
         """
-        return max(self.confs, key=lambda x: x[1])
+        idx = np.argmax(self._probs)
+        return (self._masses[idx], self._probs[idx])
 
     def sort_confs(self):
         """
         Sorts configurations by their mass.
         """
-        self.confs.sort(key = lambda x: x[0])
+        self._isospec.sort_by_mass()
 
     def merge_confs(self):
         """
         Merges configurations with an identical mass, summing their intensities.
         """
-        cmass = self.confs[0][0]
+        cmass = self._masses[0]
         cprob = 0.0
         ret = []
         for mass, prob in self.confs + [(-1, 0)]:
@@ -184,20 +205,19 @@ class Spectrum:
 
     def set_confs(self, confs):
         self.confs = confs
-        self.sort_confs()
         self.merge_confs()
 
     def __add__(self, other):
-        res = Spectrum()
-        res.confs = self.confs + other.confs
+        res = Spectrum(isospec=self._isospec + other._isospec)
         res.sort_confs()
         res.merge_confs()
         res.label = self.label + ' + ' + other.label
         return res
 
     def __mul__(self, number):
-        res = Spectrum()
-        res.set_confs([(x[0], number*x[1]) for x in self.confs])
+        new_iso = IsoSpecPy.IsoDistribution(masses = self._masses, probs = self._probs) # for lack of a straight copy() method...
+        new_iso.scale(number)
+        res = Spectrum(isospec = new_iso)
         res.label = self.label
         return res
 
@@ -206,19 +226,13 @@ class Spectrum:
         return self * number
 
     def __len__(self):
-        return len(self.confs)
+        return len(self._isospec)
 
     @staticmethod
     def ScalarProduct(spectra, weights):
-        ret = Spectrum()
-        Q = [(spectra[i].confs[0], i, 0) for i in range(len(spectra))]
-        heapq.heapify(Q)
-        while Q != []:
-            conf, spectre_no, conf_idx = heapq.heappop(Q)
-            ret.confs.append((conf[0], conf[1] * weights[spectre_no]))
-            conf_idx += 1
-            if conf_idx < len(spectra[spectre_no]):
-                heapq.heappush(Q, (spectra[spectre_no].confs[conf_idx], spectre_no, conf_idx))
+        new_iso = IsoSpecPy.IsoDistribution.LinearCombination([s._isospec for s in spectra], weights)
+        ret = Spectrum(isospec = new_iso)
+        ret.sort_confs()
         ret.merge_confs()
         return ret
 
@@ -226,8 +240,7 @@ class Spectrum:
         """
         Normalize the intensity values so that they sum up to the target value.
         """
-        x = target_value/math.fsum(v[1] for v in self.confs)
-        self.confs = [(v[0], v[1]*x) for v in self.confs]
+        self._isospec.normalize()
 
     def WSDistanceMoves(self, other):
         """
@@ -235,24 +248,20 @@ class Spectrum:
         """
         try:
             ii = 0
-            leftoverprob = other.confs[0][1]
-            for mass, prob in self.confs:
+            leftoverprob = other._probs[0]
+            for mass, prob in self._isospec:
                 while leftoverprob <= prob:
-                    yield (other.confs[ii][0], mass, leftoverprob)
+                    yield (other._masses[ii], mass, leftoverprob)
                     prob -= leftoverprob
                     ii += 1
-                    leftoverprob = other.confs[ii][1]
-                yield (other.confs[ii][0], mass, prob)
+                    leftoverprob = other._probs[ii]
+                yield (other._masses[ii], mass, prob)
                 leftoverprob -= prob
         except IndexError:
             return
 
     def WSDistance(self, other):
-        if not np.isclose(sum(x[1] for x in self.confs), 1.):
-            raise ValueError('Self is not normalized.')
-        if not np.isclose(sum(x[1] for x in other.confs), 1.):
-            raise ValueError('Other is not normalized.')
-        return math.fsum(abs(x[0]-x[1])*x[2] for x in self.WSDistanceMoves(other))
+        return self._isospec.wassersteinDistance(other._isospec)
 
     def explained_intensity(self,other):
         """
@@ -260,8 +269,8 @@ class Spectrum:
         defined as sum of minima of intensities, mass-wise.
         """
         e = 0
-        for i in range(len(self.confs)):
-            e += min(self.confs[i][1],other.confs[i][1])
+        for i in range(len(self._isospec)):
+            e += min(self._probs[i],other._probs[i])
         return e
 
     def bin_to_nominal(self, nb_of_digits=0):
@@ -373,9 +382,8 @@ class Spectrum:
         sd: float
             Standard deviation of one ion's signal
         """
-        p = [x[1] for x in reference.confs]
-        assert np.isclose(sum(p), 1), 'Spectrum needs to be normalized prior to sampling'
-        U = rd.multinomial(N, p)
+        assert np.isclose(sum(self._probs), 1), 'Spectrum needs to be normalized prior to sampling'
+        U = rd.multinomial(N, self._probs)
         U = rd.normal(U*gain, np.sqrt(U*sd**2))
         retSp = Spectrum('', empty=True, label='Sampled ' + reference.label)
         retSp.set_confs([(x[0], max(u, 0.)) for x, u in zip(reference.confs, U)])
@@ -400,7 +408,7 @@ class Spectrum:
         """
         Detects negative intensity measurements and sets them to 0.
         """
-        self.confs = [(mz, intsy if intsy >= 0 else 0.) for mz, intsy in self.confs]
+        self.confs = [(mz, intsy if intsy >= 0 else 0.) for mz, intsy in self._isospec]
 
     def centroid(self, max_width, peak_height_fraction=0.5):
         """Return confs of a centroided spectrum.
@@ -426,7 +434,7 @@ class Spectrum:
         """
         ### TODO: change max_width to be in ppm?
         # Validate the input:
-        if any(intsy < 0 for mz, intsy in self.confs):
+        if any(intsy < 0 for intsy in self._probs):
             warn("""
                  The spectrum contains negative intensities! 
                  It is advised to use Spectrum.trim_negative_intensities() before any processing
@@ -434,7 +442,7 @@ class Spectrum:
                  """)
 
         # Transpose the confs list to get an array of masses and an array of intensities:
-        mz, intsy = np.array(self.confs).T
+        mz, intsy = self._masses, self._probs
 
         # Find the local maxima of intensity:
         peak_indices = argrelmax(intsy)[0]
@@ -575,12 +583,14 @@ class Spectrum:
         Removes smallest peaks until the total removed intensity amounts
         to the given proportion of the total ion current in the spectrum.
         """
-        self.confs.sort(key = lambda x: x[1], reverse=True)
-        threshold  = removed_proportion*sum(x[1] for x in self.confs)
+        self._isospec.sort_by_probs()
+        threshold  = removed_proportion*sum(self._probs)
         removed = 0
-        while len(self.confs)>0 and removed + self.confs[-1][1] <= threshold:
-            removed += self.confs.pop()[1]
-        self.confs.sort(key = lambda x: x[0])
+        for ii in range(len(self._isospec)):
+            removed += self._probs[ii]
+            if removed > threshold:
+                break
+        self.set_isospec(masses = self._masses[ii:], probs = self.probs[ii:])
 
     def filter_peaks(self, list_of_others, margin):
         """
@@ -605,6 +615,7 @@ class Spectrum:
         for b in bounds:
             if b[0] <= c:
                 pass # to be finished
+        raise NotImplemented()
 
 
     @staticmethod
