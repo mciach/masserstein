@@ -94,7 +94,7 @@ class Spectrum:
         self._masses = self._isospec.np_masses()
         self._probs = self._isospec.np_probs()
 
-    def set_masses_probs(self, masses, probs)
+    def set_masses_probs(self, masses, probs):
         self.set_isospec(IsoSpecPy.IsoDistribution(masses = masses, probs = probs))
 
     @staticmethod
@@ -284,13 +284,13 @@ class Spectrum:
         The default nb_of_digits is zero, meaning that the m/z values
         will correspond to nominal mass of peaks.
         """
-        self.set_isospec(self._isospec.binned((0.1**nb_of_digits) / self.charge)
+        self.set_isospec(self._isospec.binned((0.1**nb_of_digits) / self.charge))
 
     def coarse_bin(self, nb_of_digits):
         """
         Rounds the m/z to a given number of decimal digits
         """
-        self.set_isospec(self._isospec.binned(0.1**nb_of_digits)
+        self.set_isospec(self._isospec.binned(0.1**nb_of_digits))
         self.merge_confs()
 
     def add_chemical_noise(self, nb_of_noise_peaks, noise_fraction):
