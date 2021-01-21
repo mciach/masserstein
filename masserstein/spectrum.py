@@ -85,15 +85,17 @@ class Spectrum:
 
     @confs.setter
     def confs(self, new_confs):
-        self.set_isospec(IsoSpecPy.IsoDistribution(masses = [nc[0] for nc in new_confs], probs = [nc[1] for nc in new_confs]))
+        self.set_masses_probs([nc[0] for nc in new_confs], [nc[1] for nc in new_confs])
         #raise Exception("Changing of the spectrum through the spectrum.confs accessor is hard-deprecated")
 
     def set_isospec(self, iso_obj):
         self._isospec = iso_obj
         self._isospec.sort_by_mass()
-        self._isospec.normalize()
         self._masses = self._isospec.np_masses()
         self._probs = self._isospec.np_probs()
+
+    def set_masses_probs(self, masses, probs)
+        self.set_isospec(IsoSpecPy.IsoDistribution(masses = masses, probs = probs))
 
     @staticmethod
     def confs_from_formula(formula, threshold=0.001, total_prob=None,
@@ -282,19 +284,13 @@ class Spectrum:
         The default nb_of_digits is zero, meaning that the m/z values
         will correspond to nominal mass of peaks.
         """
-        xcoord, ycoord = zip(*self.confs)
-        xcoord = map(lambda x: x*self.charge, xcoord)
-        xcoord = (xcoord[0] + round(x-xcoord[0], nb_of_digits) for x in xcoord)
-        xcoord = map(lambda x: x/self.charge, xcoord)
-        self.confs = list(zip(xcoord, ycoord))
-        self.sort_confs()
-        self.merge_confs()
+        self.set_isospec(self._isospec.binned((0.1**nb_of_digits) / self.charge)
 
     def coarse_bin(self, nb_of_digits):
         """
         Rounds the m/z to a given number of decimal digits
         """
-        self.confs = [(round(x[0], nb_of_digits), x[1]) for x in self.confs]
+        self.set_isospec(self._isospec.binned(0.1**nb_of_digits)
         self.merge_confs()
 
     def add_chemical_noise(self, nb_of_noise_peaks, noise_fraction):
@@ -323,9 +319,9 @@ class Spectrum:
         Adds gaussian noise to each peak, simulating
         electronic noise.
         """
-        noised = rd.normal([y for x,y in self.confs], sd)
+        noised = rd.normal(self._probs, sd)
         # noised = noised - min(noised)
-        self.confs = [(x[0], y) for x, y in zip(self.confs, noised) if y > 0]
+        self.set_masses_probs(self._masses, noised)
 
     def distort_intensity(self, N, gain, sd):
         """
@@ -590,7 +586,7 @@ class Spectrum:
             removed += self._probs[ii]
             if removed > threshold:
                 break
-        self.set_isospec(masses = self._masses[ii:], probs = self.probs[ii:])
+        self.set_masses_probs(masses = self._masses[ii:], probs = self.probs[ii:])
 
     def filter_peaks(self, list_of_others, margin):
         """
@@ -673,11 +669,11 @@ class Spectrum:
         """
         import matplotlib.pyplot as plt
         if profile:
-            plt.plot([x[0] for x in self.confs], [x[1] for x in self.confs],
+            plt.plot(self._masses, self._probs,
                      linestyle='-', linewidth=linewidth, label=self.label, **plot_kwargs)
         else:
-            plt.vlines([x[0] for x in self.confs], [0],
-                       [x[1] for x in self.confs], label = self.label,
+            plt.vlines(self._masses, [0],
+                       self._probs, label = self.label,
                        linewidth=linewidth, **plot_kwargs)
         if show:
             plt.show()
