@@ -301,16 +301,16 @@ class Spectrum:
         noise_fraction controls the amount of noise signal in the spectrum.
         nb_of_noise_peaks controls the number of peaks added.
         """
-        span = min(x[0] for x in self.confs), max(x[0] for x in self.confs)
+        span = min(self._masses), max(self._masses)
         span_increase = 1.2  # increase the mass range by a factor of 1.2
         span = [span_increase*x + (1-span_increase)*sum(span)/2 for x in span]
         noisex = uniform.rvs(loc=span[0], scale=span[1]-span[0], size=nb_of_noise_peaks)
         noisey = gamma.rvs(a=2, scale=2, size=nb_of_noise_peaks)
         noisey /= sum(noisey)
-        signal = sum(x[1] for x in self.confs)
+        signal = sum(self._probs)
         noisey *=  signal*noise_fraction /(1-noise_fraction)
-        noise = [(x, y) for x,y in zip(noisex, noisey)]
-        self.confs += noise
+        noise_iso = IsoSpecPy.IsoDistribution(masses = noisex, probs = noisey)
+        self.set_iso(self._isospec + noise_iso)
         self.sort_confs()
         self.merge_confs()
 
@@ -342,13 +342,11 @@ class Spectrum:
             The applied deviations.
         """
         p = np.array([x[1] for x in self.confs])
-        assert np.isclose(sum(p), 1), 'Spectrum needs to be normalized prior to distortion'
+        assert np.isclose(sum(self._probs), 1), 'Spectrum needs to be normalized prior to distortion'
         X = [(x[0], N*gain*x[1]) for x in self.confs]  # average signal
-        peakSD = np.sqrt(N*sd**2*p + N*gain**2*p*(1-p))
-        U = rd.normal(0, 1, len(X))
-        U *= peakSD
-        X = [(x[0], max(x[1] + u, 0.)) for x, u in zip(X, U)]
-        self.confs = X
+        peakSD = np.sqrt(N*sd**2*self._probs + N*gain**2*self._probs*(1-self._probs))
+        U = rd.normal(0.0, peakSD)
+        self.set_masses_probs(self._masses, [max(0.0, p) for p in zip(self._probs,U)])
         return U
 
     def distort_mz(self, mean, sd):
@@ -358,10 +356,8 @@ class Spectrum:
         Use non-zero mean to approximate calibration error.
         Returns the applied shift.
         """
-        N = rd.normal(mean, sd, len(self.confs))
-        self.confs = [(x[0] + u, x[1]) for x, u in zip(self.confs, N)]
-        self.sort_confs()
-        self.merge_confs()
+        N = rd.normal(mean, sd, len(self._isospec))
+        self.set_masses_probs(N + self._masses, self._probs)
         return N
 
     @staticmethod
