@@ -517,8 +517,8 @@ class Spectrum:
         Large thresholds may lead to non-zero resampled intensity in the background,
         low thresholds might cause bad interpolation due to missing intensity values.
         """
-        mz = [mz for mz, intsy in self.confs]
-        intsy = [intsy for mz, intsy in self.confs]
+        mz = self._masses
+        intsy = self._probs
         x = target_mz[0]
         for m in target_mz:
             assert m >= x, "The target_mz list is not sorted!"
@@ -545,7 +545,9 @@ class Spectrum:
                 if x1-x0 < mz_distance_threshold:  
                     y[qi] = y1 + (target_mz[qi]-x1)*(y0-y1)/(x0-x1)
                 qi += 1
-        return Spectrum(confs = list(zip(target_mz, y)))
+        ret = Spectrum()
+        ret.set_masses_probs(target_mz, y)
+        return ret
 
 
     def fuzzify_peaks(self, sd, step):
@@ -556,7 +558,7 @@ class Spectrum:
         After the filtering, the area below curve (not the sum of intensities!)
         is equal to the sum of the input peak intensities.
         """
-        new_mass = np.arange(self.confs[0][0] - 4*sd, self.confs[-1][0] + 4*sd, step)
+        new_mass = np.arange(self._masses[0] - 4*sd, self._masses[-1] + 4*sd, step)
         A = new_mass[:,np.newaxis] - np.array([m for m,i in self.confs])
         # we don't need to evaluate gaussians to far from their mean,
         # from our perspective 4 standard deviations from the mean is the same
