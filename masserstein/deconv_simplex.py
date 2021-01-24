@@ -184,7 +184,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3
         raise ValueError("""
         The experimental spectrum cannot contain negative intensities. 
         Please remove them using e.g. the Spectrum.trim_negative_intensities() method.
-        """
+        """)
                            
     vortex = [0.]*len(exp_confs)  # unxplained signal
     k = len(query)
