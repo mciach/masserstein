@@ -1,5 +1,6 @@
 import math
 import IsoSpecPy
+import IsoSpecPy.Distributions
 import numpy as np
 from scipy.stats import norm, uniform, gamma
 import random
@@ -558,19 +559,10 @@ class Spectrum:
         After the filtering, the area below curve (not the sum of intensities!)
         is equal to the sum of the input peak intensities.
         """
-        new_mass = np.arange(self._masses[0] - 4*sd, self._masses[-1] + 4*sd, step)
-        A = new_mass[:,np.newaxis] - np.array([m for m,i in self.confs])
-        # we don't need to evaluate gaussians to far from their mean,
-        # from our perspective 4 standard deviations from the mean is the same
-        # as the infinity; this allows to avoid overflow as well:
-        A[np.abs(A) > 4*sd] = np.inf  
-        A **= 2
-        A /= (-2*sd**2)
-        A = np.exp(A)
-        new_intensity = A @ np.array([i for m,i in self.confs])  # matrix multiplication
-        new_intensity /= (np.sqrt(2*np.pi)*sd)
-        self.set_confs(list(zip(new_mass, new_intensity)))
-        
+        gauss_spec = IsoSpecPy.Distributions.Gaussian(stdev=sd, bin_width=step, precision=0.9999)
+        self.set_isospec(self._isospec * gauss_spec)
+        self.sort_confs()
+        self.merge_confs()
 
     def cut_smallest_peaks(self, removed_proportion=0.001):
         """
