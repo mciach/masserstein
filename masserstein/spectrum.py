@@ -376,10 +376,12 @@ class Spectrum:
             Standard deviation of one ion's signal
         """
         assert np.isclose(sum(self._probs), 1), 'Spectrum needs to be normalized prior to sampling'
-        U = rd.multinomial(N, self._probs)
+        copy = self._isospec + IsoSpecPy.IsoThreshold(1000.0, "C1") # add an empty envelope, creating copy.
+        copy.resample(N)
+        U = copy.np_probs()
         U = rd.normal(U*gain, np.sqrt(U*sd**2))
         retSp = Spectrum('', empty=True, label='Sampled ' + reference.label)
-        retSp.set_confs([(x[0], max(u, 0.)) for x, u in zip(reference.confs, U)])
+        retSp.set_masses_probs(self._isospec.masses, U)
         return retSp
 
     def find_peaks(self):
