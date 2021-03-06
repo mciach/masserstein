@@ -218,7 +218,7 @@ class Spectrum:
         return res
 
     def __mul__(self, number):
-        new_iso = IsoSpecPy.IsoDistribution(masses = self._masses, probs = self._probs) # for lack of a straight copy() method...
+        new_iso = self._isospec.copy()
         new_iso.scale(number)
         res = Spectrum(isospec = new_iso)
         res.label = self.label
@@ -376,7 +376,7 @@ class Spectrum:
             Standard deviation of one ion's signal
         """
         assert np.isclose(sum(self._probs), 1), 'Spectrum needs to be normalized prior to sampling'
-        copy = self._isospec + IsoSpecPy.IsoThreshold(1000.0, "C1") # add an empty envelope, creating copy.
+        copy = self._isospec.copy()
         copy.resample(N)
         U = copy.np_probs()
         U = rd.normal(U*gain, np.sqrt(U*sd**2))
