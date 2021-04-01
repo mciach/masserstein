@@ -167,25 +167,29 @@ class Spectrum:
         """
         Merges configurations with an identical mass, summing their intensities.
         """
-        cmass = self.confs[0][0]
-        cprob = 0.0
-        ret = []
-        for mass, prob in self.confs + [(-1, 0)]:
-            if mass != cmass:
-                ret.append((cmass, cprob))
-                cmass = mass
-                cprob = 0.0
-            cprob += prob
-        ### TODO3: for profile spectra, set a margin of max. 5 zero intensities
-        ### around any observed intensity to preserve peak shape
-        ### For centroid spectra, remove all zero intensities.
-        #self.confs = [x for x in ret if x[1] > 1e-12]
-        self.confs = ret
+        if not self.empty:
+            cmass = self.confs[0][0]
+            cprob = 0.0
+            ret = []
+            for mass, prob in self.confs + [(-1, 0)]:
+                if mass != cmass:
+                    ret.append((cmass, cprob))
+                    cmass = mass
+                    cprob = 0.0
+                cprob += prob
+            ### TODO3: for profile spectra, set a margin of max. 5 zero intensities
+            ### around any observed intensity to preserve peak shape
+            ### For centroid spectra, remove all zero intensities.
+            #self.confs = [x for x in ret if x[1] > 1e-12]
+            self.confs = ret
 
     def set_confs(self, confs):
         self.confs = confs
-        self.sort_confs()
-        self.merge_confs()
+        if len(self.confs) > 0:
+            self.sort_confs()
+            self.merge_confs()
+        else:
+            self.empty = True
 
     def __add__(self, other):
         res = Spectrum()
@@ -395,7 +399,7 @@ class Spectrum:
         is_max = [nd <0 and pd > 0 for nd, pd in zip(diffs[1:], diffs[:-1])]
         peaks = [x for x, p in zip(self.confs[1:-1], is_max) if p]
         return peaks
-    
+
     def trim_negative_intensities(self):
         """
         Detects negative intensity measurements and sets them to 0.
@@ -428,7 +432,7 @@ class Spectrum:
         # Validate the input:
         if any(intsy < 0 for mz, intsy in self.confs):
             warn("""
-                 The spectrum contains negative intensities! 
+                 The spectrum contains negative intensities!
                  It is advised to use Spectrum.trim_negative_intensities() before any processing
                  (unless you know what you're doing).
                  """)
@@ -456,7 +460,7 @@ class Spectrum:
             # First, go to the right from the detected apex until one of the four conditions are met:
             # 1. we exceed the mz range of the spectrum
             # 2. we exceed the maximum distance from the apex given by max_dist
-            # 3. the intensity exceeds the apex intensity (meaning that we've reached another peak) 
+            # 3. the intensity exceeds the apex intensity (meaning that we've reached another peak)
             # 4. we go below the threshold intensity (the desired stopping condition)
             # Note: in step 3, an alternative is to check if the intensity simply starts to increase w.r.t. the previous inspected point.
             # Such an approach may give less false positive peaks, but is very sensitive to electronic noise and to overlapping peaks.
@@ -465,15 +469,15 @@ class Spectrum:
             while p + right_shift < n-1 and mz[p+right_shift] - mz[p] < max_dist and intsy[p+right_shift] <= current_intsy and intsy[p+right_shift] > target_intsy:
                 right_shift += 1
             # Get the mz values of points around left mz value of the peak boundary (which will be interpolated):
-            rx1, rx2 = mz[p+right_shift-1], mz[p+right_shift] 
+            rx1, rx2 = mz[p+right_shift-1], mz[p+right_shift]
             ry1, ry2 = intsy[p+right_shift-1], intsy[p+right_shift]
             if not ry1 >= target_intsy >= ry2:
                 # warn('Failed to find the right boundary of the peak at %f (probably found an overlapping peak)' % current_mz)
                 continue
-            # Find the left boundary of the peak: 
+            # Find the left boundary of the peak:
             while p - left_shift > 1 and mz[p] - mz[p-left_shift] < max_dist and intsy[p-left_shift] <= current_intsy and intsy[p-left_shift] > target_intsy:
                 left_shift += 1
-            lx1, lx2 = mz[p-left_shift], mz[p-left_shift+1]  
+            lx1, lx2 = mz[p-left_shift], mz[p-left_shift+1]
             ly1, ly2 = intsy[p-left_shift], intsy[p-left_shift+1]
             if not ly1 <= target_intsy <= ly2:
                 # warn('Failed to find the left boundary of the peak at %f (probably found an overlapping peak)' % current_mz)
@@ -504,14 +508,14 @@ class Spectrum:
         Returns a resampled spectrum with intensity values approximated
         at points given by a sorted iterable target_mz.
         The approximation is performed by a piecewise linear interpolation
-        of the spectrum intensities. The spectrum needs to be in profile mode 
+        of the spectrum intensities. The spectrum needs to be in profile mode
         in order for this procedure to work properly.
-        The spectrum is interpolated only if two target mz values closest to a 
+        The spectrum is interpolated only if two target mz values closest to a
         given target mz are closer than the specified threshold
-        This is done in order to interpolate the intensity only within peaks, not between them. 
+        This is done in order to interpolate the intensity only within peaks, not between them.
         If the surrounding mz values are further away than the threshold,
         it is assumed that the given target mz corresponds to the background and
-        there is no intensity at that point. 
+        there is no intensity at that point.
         A rule-of-thumb is to set threshold as twice the distance between
         neighboring m/z measurements.
         Large thresholds may lead to non-zero resampled intensity in the background,
@@ -542,7 +546,7 @@ class Spectrum:
             x1 = mz[ti]
             while qi < lenx and target_mz[qi] <= mz[ti]:
                 # note: maybe in this case set one of the values to zero to get a better interpolation of edges
-                if x1-x0 < mz_distance_threshold:  
+                if x1-x0 < mz_distance_threshold:
                     y[qi] = y1 + (target_mz[qi]-x1)*(y0-y1)/(x0-x1)
                 qi += 1
         return Spectrum(confs = list(zip(target_mz, y)))
@@ -561,14 +565,14 @@ class Spectrum:
         # we don't need to evaluate gaussians to far from their mean,
         # from our perspective 4 standard deviations from the mean is the same
         # as the infinity; this allows to avoid overflow as well:
-        A[np.abs(A) > 4*sd] = np.inf  
+        A[np.abs(A) > 4*sd] = np.inf
         A **= 2
         A /= (-2*sd**2)
         A = np.exp(A)
         new_intensity = A @ np.array([i for m,i in self.confs])  # matrix multiplication
         new_intensity /= (np.sqrt(2*np.pi)*sd)
         self.set_confs(list(zip(new_mass, new_intensity)))
-        
+
 
     def cut_smallest_peaks(self, removed_proportion=0.001):
         """
@@ -607,53 +611,54 @@ class Spectrum:
                 pass # to be finished
 
 
-    @staticmethod
-    def filter_against_theoretical(experimental, theoreticals, margin=0.15):
+    def filter_against_other(self, others, margin=0.15):
         """
-        Remove signal from the empirical spectra which is far from theoretical.
+        Remove signal from the spectrum which is far from other spectra signal.
 
-        This method removes peaks from experimental spectrum which are outside
-        theoretical peaks +/- margin.
+        This method removes peaks from self spectrum which m/z is outside the
+        area of any peak of other spectra +/- margin. The method does not
+        modify self spectrum and returns a new instance of the filtered
+        spectrum.
 
         Parameters
         ----------
-        experimental
-            Empirical spectrum.
-        theoreticals:
-            One instance of theoretical or iterable of instances of theoretical
-            spectra.
+        self
+            Spectrum to be filtered.
+        others:
+            One instance of the spectrum against self is filtered or iterable of
+            instances of other spectra.
         margin
-            m/z radius within empirical spectrum should be left.
+            m/z radius within signal should be left.
 
         Returns
         -------
         Spectrum
-            An empirical spectrum with filtered out peaks.
+            A new spectrum with filtered out peaks.
+
         """
         try:
-            th_confs = []
-            for theoretical_spectrum in theoreticals:
-                th_confs.extend(theoretical_spectrum.confs)
-            theoretical = Spectrum()
-            theoretical.set_confs(th_confs)
+            other_confs = []
+            for other_spectrum in others:
+                other_confs.extend(other_spectrum.confs)
+            other = Spectrum(confs=other_confs)
         except TypeError:
-            theoretical = theoreticals
-        experimental_confs = experimental.confs
-        theoretical_masses = [i[0] for i in theoretical.confs]
+            other = others
+        other_masses = [i[0] for i in other.confs]
+
 
         result_confs = []
         index = 0
-        for mz, abund in experimental_confs:
-            while (index + 1 < len(theoretical_masses) and
-                   theoretical_masses[index + 1] < mz):
+        for mz, abund in self.confs:
+            while (index + 1 < len(other_masses) and
+                   other_masses[index + 1] < mz):
                 index += 1
-            if abs(mz - theoretical_masses[index]) <= margin or (
-                    index + 1 < len(theoretical_masses) and
-                    abs(mz - theoretical_masses[index + 1]) <= margin):
+            if abs(mz - other_masses[index]) <= margin or (
+                    index + 1 < len(other_masses) and
+                    abs(mz - other_masses[index + 1]) <= margin):
                 result_confs.append((mz, abund))
-        new_spectrum = Spectrum(label=experimental.label)
-        new_spectrum.confs = result_confs
-        return new_spectrum
+
+        result_spectrum = Spectrum(confs=result_confs, label=self.label)
+        return result_spectrum
 
     def plot(self, show = True, profile=False, linewidth=1, **plot_kwargs):
         """
@@ -674,7 +679,7 @@ class Spectrum:
     @staticmethod
     def plot_all(spectra, show=True, profile=False, cmap=None, **plot_kwargs):
         """
-        Shows the supplied list of spectra on a single plot. 
+        Shows the supplied list of spectra on a single plot.
         """
         import matplotlib.pyplot as plt
         import matplotlib.cm as cm
@@ -701,7 +706,7 @@ if __name__=="__main__":
     import matplotlib.pyplot as plt
     from copy import deepcopy
     S = Spectrum(formula="C2H5OH", threshold=0.01)
-    
+
     S.add_chemical_noise(4, 0.2)
     S.plot()
 
@@ -712,7 +717,7 @@ if __name__=="__main__":
     S.plot(profile=True, show=False)
     C.plot(show=False)
     plt.show()
-    
+
     target_mz = np.linspace(45, 56, num=100)
     R = S.resample(target_mz)
     plt.subplot(221)
