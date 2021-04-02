@@ -317,7 +317,7 @@ class Spectrum:
             prev_span = (min(x[0] for x in self.confs),
                          max(x[0] for x in self.confs))
             span_move = 0.5 * (span_increase - 1) * (prev_span[1] - prev_span[0])
-            span = (prev_span[0] - span_move,
+            span = (max(prev_span[0] - span_move, 0),
                     prev_span[1] + span_move)
         noisex = uniform.rvs(loc=span[0], scale=span[1]-span[0],
                              size=nb_of_noise_peaks)
