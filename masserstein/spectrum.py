@@ -288,24 +288,45 @@ class Spectrum:
         self.confs = [(round(x[0], nb_of_digits), x[1]) for x in self.confs]
         self.merge_confs()
 
-    def add_chemical_noise(self, nb_of_noise_peaks, noise_fraction):
+    def add_chemical_noise(self, nb_of_noise_peaks, noise_fraction, span=1.2):
         """
-        Adds additional peaks with uniform distribution in the m/z domain
-        and gamma distribution in the intensity domain. The spectrum does NOT need
-        to be normalized. Accordingly, the method does not normalize the intensity afterwards!
-        noise_fraction controls the amount of noise signal in the spectrum.
-        nb_of_noise_peaks controls the number of peaks added.
+        Add additional peaks that simulate chemical noise.
+
+        The method adds additional peaks with uniform distribution in the m/z
+        domain and gamma distribution in the intensity domain. The spectrum
+        does NOT need to be normalized. Accordingly, the method does not
+        normalize the intensity afterwards! Works in-situ (on self).
+
+        Parameters
+        ----------
+        nb_of_noise_peaks : int
+            The number of added peaks.
+        noise_fraction : float
+            The amount of noise signal in the spectrum, >= 0 and <= 1.
+        span: float or 2-tuple of floats
+           If float, then `span` specifies a factor by which the m/z range is
+           increased. If 2-tuple, then `span` specifies m/z range, which is
+           noised.
+
+        Returns
+        -------
+        None
         """
-        span = min(x[0] for x in self.confs), max(x[0] for x in self.confs)
-        span_increase = 1.2  # increase the mass range by a factor of 1.2
-        span = [span_increase*x + (1-span_increase)*sum(span)/2 for x in span]
-        noisex = uniform.rvs(loc=span[0], scale=span[1]-span[0], size=nb_of_noise_peaks)
+        if isinstance(span, (float, int)):
+            span_increase = span
+            prev_span = (min(x[0] for x in self.confs),
+                         max(x[0] for x in self.confs))
+            span_move = 0.5 * (span_increase - 1) * (prev_span[1] - prev_span[0])
+            span = (max(prev_span[0] - span_move, 0),
+                    prev_span[1] + span_move)
+        noisex = uniform.rvs(loc=span[0], scale=span[1]-span[0],
+                             size=nb_of_noise_peaks)
         noisey = gamma.rvs(a=2, scale=2, size=nb_of_noise_peaks)
         noisey /= sum(noisey)
         signal = sum(x[1] for x in self.confs)
-        noisey *=  signal*noise_fraction /(1-noise_fraction)
+        noisey *=  signal * noise_fraction / (1 - noise_fraction)
         noise = [(x, y) for x,y in zip(noisex, noisey)]
-        self.confs += noise
+        self.confs.extend(noise)
         self.sort_confs()
         self.merge_confs()
 
