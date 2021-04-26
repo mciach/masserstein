@@ -263,7 +263,6 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         lpVars.append(lp.LpVariable('Z%i' % (n+1), 0, penalty_th, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
 
-
         if not quiet:
                 print("Variables created")
 
@@ -284,7 +283,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         for i in range(n-1):
                 program +=  lpVars[i] + lpVars[n-1]  <=  penalty, 'g_%i' % (i+1)
-                program +=  -lpVars[i] + lpVars[n]  <= penalty_th, 'g_prime_%i' % (i+1)
+                program +=  lpVars[n] - lpVars[i] <= penalty_th, 'g_prime_%i' % (i+1)
         for i in range(n-2):
                 program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
                 program += lpVars[i+1] - lpVars[i] <= 0, 'epsilon_minus_%i' % (i+1)
@@ -319,7 +318,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 Please check the deconvolution results and consider reporting this warning to the authors.
                                     """ % (sum(probs)+sum(abyss)))
 
-        return {"probs": probs, "noise_in_theoretical": p0_prime, "experimental_trash": abyss, "theoretical_trash": abyss_th, "fun": lp.value(program.objective), 'status': program.status}
+        return {"probs": probs, "noise_in_theoretical": p0_prime, "trash": abyss, "theoretical_trash": abyss_th, "fun": lp.value(program.objective), 'status': program.status}
 
 
 def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
@@ -423,7 +422,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 Please check the deconvolution results and consider reporting this warning to the authors.
                                     """ % (sum(probs)+sum(abyss)))
 
-        return {"probs": probs, "noise_in_theoretical": p0_prime, "experimental_trash": abyss, "theoretical_trash": abyss_th, "fun": lp.value(program.objective), 'status': program.status}
+        return {"probs": probs, "noise_in_theoretical": p0_prime, "trash": abyss, "theoretical_trash": abyss_th, "fun": lp.value(program.objective), 'status': program.status}
 
 
 def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False, progress=True):
