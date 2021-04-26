@@ -269,15 +269,15 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum([1, 0, -1], lpVars[n-1:])), 'Dual_objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([1, 0, -1], lpVars[n-1:]))), 'Dual_objective'
 
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum([1, 0, 0], lpVars[n-1:])) <= 0, 'P_%i' % (j+1)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([1, 0, 0], lpVars[n-1:]))) <= 0, 'P_%i' % (j+1)
 
         exp_vec = intensity_generator(exp_confs, global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum([0, -1, -1], lpVars[n-1:])) <= 0, 'p0_prime'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, -1, -1], lpVars[n-1:]))) <= 0, 'p0_prime'
 
         if not quiet:
                 print('tsk tsk')
@@ -373,15 +373,15 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum([-1, 0, 0], lpVars[n-1:])), 'Dual_objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 0], lpVars[n-1:]))), 'Dual_objective'
 
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum([-1, 0, 1], lpVars[n-1:])) <= -penalty, 'P_%i' % (j+1)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1], lpVars[n-1:]))) <= -penalty, 'P_%i' % (j+1)
 
         exp_vec = intensity_generator(exp_confs, global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum([0, 1, -1], lpVars[n-1:])) <= penalty_th, 'p0_prime'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, 1, -1], lpVars[n-1:]))) <= penalty_th, 'p0_prime'
 
         if not quiet:
                 print('tsk tsk')
@@ -620,7 +620,7 @@ Please check the deconvolution results and consider reporting this warning to th
     return {'proportions': proportions, 'noise': vortex}
 
 
-def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False, progress=True, noise="in_both_alg1", **MTD_th=1.):
+def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False, progress=True, noise="in_both_alg1", **MTD_th):
     """
     Returns estimated proportions of molecules from query in spectrum.
     Performs initial filtering of formulas and experimental spectrum to speed
