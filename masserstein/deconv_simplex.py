@@ -260,7 +260,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n-1), 0, interval_lengths[n-2], lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n), 0, None, lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n+1), 0, penalty_th, lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n+1), 0, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
 
         if not quiet:
