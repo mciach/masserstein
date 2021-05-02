@@ -202,7 +202,7 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
         constraints = program.constraints
         probs = [round(constraints['P%i' % i].pi, 12) for i in range(1, k+1)]
         exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
-        abyss = [round(constraints['g%i' % i].pi, 12) for i in range(1, n+1)]
+        abyss = [round(constraints['g%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
         # note: accounting for number of summands in checking of result correctness,
         # because summation of many small numbers introduces numerical errors
         if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
@@ -259,8 +259,8 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         for i in range(n-2):
                 lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n-1), 0, interval_lengths[n-2], lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n), 0, None, lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n+1), 0, None, lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n), 0, penalty, lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n+1), 0, penalty_th, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
 
         if not quiet:
@@ -268,22 +268,22 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 0], lpVars[n-1:]))), 'Dual_objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([1, 0, 0], lpVars[n-1:]))), 'Dual_objective'
 
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1], lpVars[n-1:]))) <= 0, 'P_%i' % (j+1)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([1, 0, 1], lpVars[n-1:]))) <= 0, 'P_%i' % (j+1)
 
         exp_vec = intensity_generator(exp_confs, global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, 1, -1], lpVars[n-1:]))) <= 0, 'p0_prime'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, -1, -1], lpVars[n-1:]))) <= 0, 'p0_prime'
 
         if not quiet:
                 print('tsk tsk')
 
         for i in range(n-1):
-                program +=  lpVars[i] - lpVars[n-1]  <=  penalty, 'g_%i' % (i+1)
-                program +=  -lpVars[n] - lpVars[i] <= penalty_th, 'g_prime_%i' % (i+1)
+                program +=  lpVars[i] + lpVars[n-1]  <=  penalty, 'g_%i' % (i+1)
+                program +=  lpVars[n] - lpVars[i] <= penalty_th, 'g_prime_%i' % (i+1)
         for i in range(n-2):
                 program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
                 program += lpVars[i+1] - lpVars[i] <= 0, 'epsilon_minus_%i' % (i+1)
@@ -306,10 +306,13 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         constraints = program.constraints
         probs = [round(constraints['P_%i' % i].pi, 12) for i in range(1, k+1)]
         p0_prime = round(constraints['p0_prime'].pi, 12)
-        abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n)]
-        abyss.append(1-sum(probs)-sum(abyss))
-        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n)]
-        abyss_th.append(p0_prime-sum(abyss_th))
+        exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
+        abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n) if exp_vec[i-1] > 0.]
+        if exp_vec[n-1] > 0.:
+        	abyss.append(1-sum(probs)-sum(abyss))
+        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n) if exp_vec[i-1] > 0.]
+        if exp_vec[n-1] > 0.:
+        	abyss_th.append(p0_prime-sum(abyss_th))
 
         if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
                 warn("""In dualdeconv3:
@@ -413,8 +416,9 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         constraints = program.constraints
         probs = [round(constraints['P_%i' % i].pi, 12) for i in range(1, k+1)]
         p0_prime = round(constraints['p0_prime'].pi, 12)
-        abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n+1)]
-        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1)]
+        exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
+        abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
+        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
         if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
                 warn("""In dualdeconv4:
                 Proportions of signal and noise sum to %f instead of 1.
@@ -768,6 +772,7 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
         print("Ion currents in chunks:", chunk_TICs)
 
     # Deconvolving chunks:
+    p0_prime = 0
     for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", total=len(exp_conf_chunks)):
         if verbose:
             print("Deconvolving chunk %i" % current_chunk_ID)
@@ -816,6 +821,8 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
             for i, p in enumerate(dec['trash']):
                 original_conf_id = conf_IDs[i]
                 vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
+            if noise == "in_both_alg1" or noise == "in_both_alg2":
+            	p0_prime = p0_prime + dec["noise_in_theoretical"]*chunk_TICs[current_chunk_ID]
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
         warn("""In estimate_proportions2:
@@ -824,7 +831,7 @@ This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                         """ % (sum(proportions)+sum(vortex)))
     if noise == "in_both_alg1" or noise == "in_both_alg2":
-        return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': dec['noise_in_theoretical']}
+        return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': p0_prime}
     if noise == "only_in_exp":
         return {'proportions': proportions, 'noise': vortex}
 
