@@ -773,6 +773,7 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
 
     # Deconvolving chunks:
     p0_prime = 0
+    vortex_th = []
     for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", total=len(exp_conf_chunks)):
         if verbose:
             print("Deconvolving chunk %i" % current_chunk_ID)
@@ -823,6 +824,8 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
                 vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
             if noise == "in_both_alg1" or noise == "in_both_alg2":
             	p0_prime = p0_prime + dec["noise_in_theoretical"]*chunk_TICs[current_chunk_ID]
+            	rescaled_vortex_th = [element*chunk_TICs[current_chunk_ID] for element in dec['theoretical_trash']]
+            	vortex_th = vortex_th + rescaled_vortex_th
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
         warn("""In estimate_proportions2:
@@ -831,7 +834,7 @@ This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                         """ % (sum(proportions)+sum(vortex)))
     if noise == "in_both_alg1" or noise == "in_both_alg2":
-        return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': p0_prime}
+        return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': vortex_th, 'proportion_of_noise_in_theoretical': p0_prime}
     if noise == "only_in_exp":
         return {'proportions': proportions, 'noise': vortex}
 
