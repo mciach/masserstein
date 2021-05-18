@@ -258,9 +258,9 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         lpVars = []
         for i in range(n-2):
                 lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n-1), 0, interval_lengths[n-2], lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n), 0, penalty, lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n+1), 0, penalty_th, lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n), None, None, lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
 
         if not quiet:
@@ -286,7 +286,10 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 program +=  lpVars[n] - lpVars[i] <= penalty_th, 'g_prime_%i' % (i+1)
         for i in range(n-2):
                 program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
-                program += lpVars[i+1] - lpVars[i] <= 0, 'epsilon_minus_%i' % (i+1)
+                program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
+
+        program += -lpVars[n-1] <= penalty, 'g_%i' % (n)
+        program += -lpVars[n] <= penalty_th, 'g_prime_%i' % (n)
 
         if not quiet:
                 print("Constraints written")
@@ -307,12 +310,8 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         probs = [round(constraints['P_%i' % i].pi, 12) for i in range(1, k+1)]
         p0_prime = round(constraints['p0_prime'].pi, 12)
         exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
-        abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n) if exp_vec[i-1] > 0.]
-        if exp_vec[n-1] > 0.:
-        	abyss.append(1-sum(probs)-sum(abyss))
-        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n) if exp_vec[i-1] > 0.]
-        if exp_vec[n-1] > 0.:
-        	abyss_th.append(p0_prime-sum(abyss_th))
+        abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
+        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
 
         if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
                 warn("""In dualdeconv3:
@@ -366,7 +365,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         lpVars = []
         for i in range(n-2):
                 lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n-1), 0, interval_lengths[n-2], lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % n, None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
@@ -393,7 +392,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 program +=  -lpVars[i] - lpVars[n]  <= 0, 'g_prime_%i' % (i+1)
         for i in range(n-2):
                 program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
-                program += lpVars[i+1] - lpVars[i] <= 0, 'epsilon_minus_%i' % (i+1)
+                program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
 
         program += -lpVars[n-1] <= 0, 'g_%i' % (n)
         program += -lpVars[n] <= 0, 'g_prime_%i' % (n)
