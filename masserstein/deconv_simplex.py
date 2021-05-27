@@ -262,28 +262,29 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         lpVars.append(lp.LpVariable('Z%i' % (n), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n+3), 0, None, lp.LpContinuous))
 
         if not quiet:
                 print("Variables created")
 
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([1, 0, 0], lpVars[n-1:]))), 'Dual_objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 0, -1], lpVars[n-1:]))), 'Dual_objective'
 
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([1, 0, 1], lpVars[n-1:]))) <= 0, 'P_%i' % (j+1)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1, -1], lpVars[n-1:]))) <= 0, 'P_%i' % (j+1)
 
         exp_vec = intensity_generator(exp_confs, global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, -1, -1], lpVars[n-1:]))) <= 0, 'p0_prime'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, 1, -1, 0], lpVars[n-1:]))) <= 0, 'p0_prime'
 
         if not quiet:
                 print('tsk tsk')
 
         for i in range(n-1):
-                program +=  lpVars[i] + lpVars[n-1]  <=  penalty, 'g_%i' % (i+1)
-                program +=  lpVars[n] - lpVars[i] <= penalty_th, 'g_prime_%i' % (i+1)
+                program +=  lpVars[i] - lpVars[n-1]  <=  penalty, 'g_%i' % (i+1)
+                program +=  -lpVars[n] - lpVars[i] <= penalty_th, 'g_prime_%i' % (i+1)
         for i in range(n-2):
                 program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
                 program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
@@ -311,7 +312,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         p0_prime = round(constraints['p0_prime'].pi, 12)
         exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
         abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
-        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
+        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1)]
 
         if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
                 warn("""In dualdeconv3:
@@ -369,20 +370,21 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         lpVars.append(lp.LpVariable('Z%i' % n, None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
+        lpVars.append(lp.LpVariable('Z%i' % (n+3), 0, None, lp.LpContinuous))
         if not quiet:
                 print("Variables created")
 
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 0], lpVars[n-1:]))), 'Dual_objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 0, -1], lpVars[n-1:]))), 'Dual_objective'
 
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1], lpVars[n-1:]))) <= -penalty, 'P_%i' % (j+1)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1, -1], lpVars[n-1:]))) <= -penalty, 'P_%i' % (j+1)
 
         exp_vec = intensity_generator(exp_confs, global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, 1, -1], lpVars[n-1:]))) <= penalty_th, 'p0_prime'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, 1, -1, 0], lpVars[n-1:]))) <= penalty_th, 'p0_prime'
 
         if not quiet:
                 print('tsk tsk')
@@ -417,7 +419,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         p0_prime = round(constraints['p0_prime'].pi, 12)
         exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
         abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
-        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1) if exp_vec[i-1] > 0.]
+        abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1)]
         if not np.isclose(sum(probs)+sum(abyss), 1., atol=len(abyss)*1e-03):
                 warn("""In dualdeconv4:
                 Proportions of signal and noise sum to %f instead of 1.
