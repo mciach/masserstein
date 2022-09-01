@@ -551,205 +551,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         "fun": lp.value(program.objective)+penalty, 'status': program.status, 'global_mass_axis': global_mass_axis}
 
 
-def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False, progress=True):
-
-    """
-    Returns estimated proportions of molecules from query in spectrum.
-    Performs initial filtering of formulas and experimental spectrum to speed
-    up the computations.
-
-    _____
-    Parameters:
-    spectrum: Spectrum object
-        The experimental (subject) spectrum.
-    query: list of Spectrum objects
-        A list of theoretical (reference) spectra.
-    MTD: Maximum Transport Distance, float
-        Ion current will be transported up to this distance when estimating
-        molecule proportions.
-    MDC: Minimum Detectable Current, float
-        If the isotopic envelope of an ion encompasses less than
-        this amount of the total ion current, it is assumed that this ion
-        is absent in the spectrum.
-    MMD: Maximum Mode Distance, float
-        If there is no experimental peak within this distance from the
-        highest peak of an isotopic envelope of a molecule,
-        it is assumed that this molecule is absent in the spectrum.
-        Setting this value to -1 disables filtering.
-    max_reruns: int
-        Due to numerical errors, some partial results may be inaccurate.
-        If this is detected, then those results are recomputed for a maximal number of times
-        given by this parameter.
-    verbose: bool
-        Print diagnistic messages?
-    progress: bool
-        Whether to display progress bars during work.
-
-    _____
-    Returns: dict
-        A dictionary with the following entries:
-
-        - proportions: List of proportions of query (i.e. theoretical, reference) spectra.
-
-        - noise: List of intensities that could not be explained by the supplied formulas. 
-        The intensities correspond to the m/z values of the experimental spectrum.
-    """
-
-    def progr_bar(x, **kwargs):
-        if progress:
-            return tqdm(x, **kwargs)
-        else:
-            return x
-    try:
-        exp_confs = spectrum.confs
-    except:
-        print("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?")
-        raise
-    assert abs(sum(x[1] for x in exp_confs) - 1.) < 1e-08, 'The experimental spectrum is not normalized.'
-    assert all(x[0] >= 0. for x in exp_confs), 'Found experimental peaks with negative masses!'
-    if any(x[1] < 0 for x in exp_confs):
-        raise ValueError("""
-        The experimental spectrum cannot contain negative intensities. 
-        Please remove them using e.g. the Spectrum.trim_negative_intensities() method.
-        """)
-                           
-    vortex = [0.]*len(exp_confs)  # unxplained signal
-    k = len(query)
-    proportions = [0.]*k
-
-    for i, q in enumerate(query):
-        assert abs(sum(x[1] for x in q.confs) - 1.) < 1e-08, 'Theoretical spectrum %i is not normalized' %i
-        assert all(x[0] >= 0 for x in q.confs), 'Theoretical spectrum %i has negative masses!' % i
-
-    # Initial filtering of formulas
-    envelope_bounds = []
-    filtered = []
-    for i in progr_bar(range(k), desc = "Initial filtering of formulas"):
-        s = query[i]
-        mode = s.get_modal_peak()[0]
-        mn = s.confs[0][0]
-        mx = s.confs[-1][0]
-        matching_current = MDC==0. or sum(x[1] for x in misc.extract_range(exp_confs, mn - MTD, mx + MTD)) >= MDC
-        matching_mode = MMD==-1 or abs(misc.closest(exp_confs, mode)[0] - mode) <= MMD
-
-        if matching_mode and matching_current:
-            envelope_bounds.append((mn, mx, i))
-        else:
-            envelope_bounds.append((-1, -1, i))
-            filtered.append(i)
-
-    envelope_bounds.sort(key=lambda x: x[0])  # sorting by lower bounds
-    if verbose:
-        print("Removed theoretical spectra due to no matching experimental peaks:", filtered)
-        print('Envelope bounds:', envelope_bounds)
-
-    # Computing chunks
-    chunkIDs = [0]*k  # Grouping of theoretical spectra
-    # Note: order of chunkIDs corresponds to order of query, not the envelope bounds
-    # chunk_bounds = mass intervals matching chunks, accounting for mass transport
-    # order of chunk_bounds corresponds to increasing chunk ID,
-    # so that chunk_bounds[0] is the interval for chunk nr 0
-    chunk_bounds = []
-    current_chunk = 0
-    first_present = 0
-    while envelope_bounds[first_present][0] == -1 and first_present < k-1:
-        _, _, sp_id = envelope_bounds[first_present]
-        chunkIDs[sp_id] = -1
-        first_present += 1
-    prev_mn, prev_mx, prev_id = envelope_bounds[first_present]
-    for i in progr_bar(range(first_present, k), desc = "Computing chunks"):
-        mn, mx, sp_id = envelope_bounds[i]
-        if mn - prev_mx > 2*MTD:
-            current_chunk += 1
-            chunk_bounds.append( (prev_mn-MTD, prev_mx+MTD) )
-            prev_mn = mn  # get lower bound of new chunk
-        prev_mx = mx  # update the lower bound of current chunk
-        chunkIDs[sp_id] = current_chunk
-    chunk_bounds.append( (prev_mn-MTD, prev_mx+MTD) )
-    nb_of_chunks = len(chunk_bounds)
-    if verbose:
-        print('Number of chunks: %i' % nb_of_chunks)
-        print("ChunkIDs:", chunkIDs)
-        print("Chunk bounds:", chunk_bounds)
-
-    # Splitting the experimental spectrum into chunks
-    exp_conf_chunks = []  # list of indices of experimental confs matching chunks
-    current_chunk = 0
-    matching_confs = []  # experimental confs matching current chunk
-    cur_bound = chunk_bounds[current_chunk]
-    for conf_id, cur_conf in progr_bar(enumerate(exp_confs), desc = "Splitting the experimental spectrum into chunks"):
-        while cur_bound[1] < cur_conf[0] and current_chunk < nb_of_chunks-1:
-            exp_conf_chunks.append(matching_confs)
-            matching_confs = []
-            current_chunk += 1
-            cur_bound = chunk_bounds[current_chunk]
-        if cur_bound[0] <= cur_conf[0] <= cur_bound[1]:
-            matching_confs.append(conf_id)
-        else:
-            # experimental peaks outside chunks go straight to vortex
-            vortex[conf_id] = cur_conf[1]
-    exp_conf_chunks.append(matching_confs)
-    chunk_TICs = [sum(exp_confs[i][1] for i in chunk_list) for chunk_list in exp_conf_chunks]
-    if verbose:
-        # print('Trash after filtering:', vortex)
-        print("Ion currents in chunks:", chunk_TICs)
-
-    # Deconvolving chunks:
-    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", 
-                                                                            total=len(exp_conf_chunks)):
-        if verbose:
-            print("Deconvolving chunk %i" % current_chunk_ID)
-        if chunk_TICs[current_chunk_ID] < 1e-16:
-            # nothing to deconvolve, pushing remaining signal to vortex
-            if verbose:
-                print('Chunk %i is almost empty - skipping deconvolution' % current_chunk_ID)
-            for i in conf_IDs:
-                vortex[i] = exp_confs[i][1]
-        else:
-            chunkSp = Spectrum('', empty=True)
-            # Note: conf_IDs are monotonic w.r.t. conf mass,
-            # so constructing a spectrum will not change the order
-            # of confs supplied in the list below:
-            chunkSp.set_confs([exp_confs[i] for i in conf_IDs])
-            chunkSp.normalize()
-            theoretical_spectra_IDs = [i for i, c in enumerate(chunkIDs) if c == current_chunk_ID]
-            thrSp = [query[i] for i in theoretical_spectra_IDs]
-
-            rerun = 0
-            success = False
-            while not success:
-                    rerun += 1
-                    if rerun > max_reruns:
-                            raise RuntimeError('Failed to deconvolve a fragment of the experimental \
-                                                spectrum with mass (%f, %f)' % chunk_bounds[current_chunk_ID])
-                    dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True)
-                    if dec['status'] == 1:
-                            success=True
-                    else:
-                            warn('Rerunning computations for chunk %i due to status %s' % (current_chunk_ID, 
-                                                                                        lp.LpStatus[dec['status']]))
-            if verbose:
-                    print('Chunk %i deconvolution status:', lp.LpStatus[dec['status']])
-                    print('Signal proportion:', sum(dec['probs']))
-                    print('Noise proportion:', sum(dec['trash']))
-                    print('Total explanation:', sum(dec['probs'])+sum(dec['trash']))
-            for i, p in enumerate(dec['probs']):
-                original_thr_spectrum_ID = theoretical_spectra_IDs[i]
-                proportions[original_thr_spectrum_ID] = p*chunk_TICs[current_chunk_ID]
-            for i, p in enumerate(dec['trash']):
-                original_conf_id = conf_IDs[i]
-                vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
-
-    if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
-        warn("""In estimate_proportions:
-Proportions of signal and noise sum to %f instead of 1.
-This may indicate improper results.
-Please check the deconvolution results and consider reporting this warning to the authors.
-                        """ % (sum(proportions)+sum(vortex)))
-    return {'proportions': proportions, 'noise': vortex}
-
-
-def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, 
+def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, 
                         MMD=-1, max_reruns=3, verbose=False, 
                         progress=True, noise="only_in_exp", MTD_th=1.):
 
@@ -841,15 +643,14 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8,
     k = len(query)
     proportions = [0.]*k
 
-    ###
     assert (noise=='in_both_alg1' or noise=='in_both_alg2' or noise=='only_in_exp'), 'The value of noise argument \
                                                                                     must be one of '\
                                                                                     '"only_in_exp", "in_both_alg1", \
                                                                                     "in_both_alg2".'
-    if noise=='only_in_exp': ###
-        MTD_max = MTD ###
-    elif (noise=='in_both_alg1' or noise=='in_both_alg2'): ###
-        MTD_max = max(MTD, MTD_th) ###
+    if noise=='only_in_exp':
+        MTD_max = MTD
+    elif (noise=='in_both_alg1' or noise=='in_both_alg2'):
+        MTD_max = max(MTD, MTD_th)
 
     for i, q in enumerate(query):
         assert abs(sum(x[1] for x in q.confs) - 1.) < 1e-08, 'Theoretical spectrum %i is not normalized' %i
@@ -987,9 +788,9 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8,
             if noise == "in_both_alg1" or noise == "in_both_alg2":
                 p0_prime = p0_prime + dec["noise_in_theoretical"]*chunk_TICs[current_chunk_ID]
                 rescaled_vortex_th = [element*chunk_TICs[current_chunk_ID] for element in dec['theoretical_trash']]
-                vortex_th = vortex_th + rescaled_vortex_th ###
-                global_mass_axis = global_mass_axis + dec['global_mass_axis'] ###
-                #vortex_th.append(rescaled_vortex_th) ###
+                vortex_th = vortex_th + rescaled_vortex_th
+                global_mass_axis = global_mass_axis + dec['global_mass_axis']
+                #vortex_th.append(rescaled_vortex_th)
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
         warn("""In estimate_proportions2:
