@@ -35,10 +35,32 @@ def intensity_generator(confs, mzaxis):
 
 def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         """
-        Different formulation, maybe faster
-        exp_sp: experimental spectrum
-        thr_sp: list of theoretical spectra
-        penalty: denoising penalty
+        This function solves linear program describing optimal transport of signal between the experimental spectrum
+        and the list of theoretical (reference) spectra. Additionally, an auxiliary point is introduced in order to
+        remove noise from the experimental spectrum, as described by Ciach et al., 2020. 
+
+        _____
+        Parameters:
+            exp_sp: Spectrum object
+                Experimental spectrum.
+            thr_sp: list of Spectrum objects
+                List of theoretical (reference) spectra.
+            penalty: float
+                Denoising penalty.
+
+        _____
+        Returns: dict
+            Dictionary with the following entries:
+
+            - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
+            spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
+
+            - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
+
+            - fun: Optimal value of the objective function.
+
+            - status: Status of the linear program.
+
         """
         start = time()
         exp_confs = exp_sp.confs.copy()
@@ -129,6 +151,7 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
 
         """
         Alternative version of dualdeconv2 - using .pi instead of .dj to extract optimal values of variables.
+        Slower, but .pi is better documented than .dj in pulp. Gives the same results as dualdeconv2.
         This function solves linear program describing optimal transport of signal between the experimental spectrum
         and the list of theoretical (reference) spectra. Additionally, an auxiliary point is introduced in order to
         remove noise from the experimental spectrum, as described by Ciach et al., 2020. 
@@ -551,9 +574,9 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         "fun": lp.value(program.objective)+penalty, 'status': program.status, 'global_mass_axis': global_mass_axis}
 
 
-def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, 
+def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
                         MMD=-1, max_reruns=3, verbose=False, 
-                        progress=True, noise="only_in_exp", MTD_th=1.):
+                        progress=True, MTD_th=None):
 
     """
     Returns estimated proportions of molecules from query in spectrum.
@@ -585,17 +608,11 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8,
         Print diagnistic messages? Default is False.
     progress: bool
         Whether to display progress bars during work. Default is True.
-    noise: string
-        One of: "only_in_exp", "in_both_alg1", "in_both_alg2". Choose "only_in_exp" if you expect 
-        noise only in the experimental spectrum. Choose "in_both_alg1"/"in_both_alg2" if you expect noise
-        in theoretical (reference) spectra as well. Choosing "in_both_alg1" forbids transporting signal 
-        between two auxiliary points, choosing "in_both_alg2" does not, however both these options 
-        always give the same result. Time of computations for these options may differ. If you decide to choose
-        "in_both_alg1" or "in_both_alg2", you should also set the value of MTD_th. Default is "only_in_exp".
     MTD_th: Maximum Transport Distance for theoretical spectra, float
-        Ion current from theoretical spectra will be transported up to this distance when estimating
-        molecule proportions.
-        This argument is used only when noise is set to "in_both_alg1" or "in_both_alg2". Default is 1.
+        If presence of noise in theoretical (reference, query) spectra is not expected, 
+        then this parameter should be set to None. Otherwise, set its value to some positive real number.
+        Ion current from theoretical spectra will be transported up to this distance 
+        when estimating molecule proportions. Default is None.
 
     _____
     Returns: dict
@@ -606,7 +623,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8,
         - noise: List of intensities that could not be explained by the supplied formulas. 
         The intensities correspond to the m/z values of the experimental spectrum.
 
-        If noise parameter is set to "in_both_alg1" or "in_both_alg2", then the dictionary contains also 
+        If MTD_th parameter is not equal to None, then the dictionary contains also 
         the following entries:
 
         - noise_in_theoretical: List of intensities from query (i.e. theoretical, reference) spectra
@@ -639,17 +656,13 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8,
         Please remove them using e.g. the Spectrum.trim_negative_intensities() method.
         """)
                            
-    vortex = [0.]*len(exp_confs)  # unxplained signal
+    vortex = [0.]*len(exp_confs)  # unexplained signal
     k = len(query)
     proportions = [0.]*k
 
-    assert (noise=='in_both_alg1' or noise=='in_both_alg2' or noise=='only_in_exp'), 'The value of noise argument \
-                                                                                    must be one of '\
-                                                                                    '"only_in_exp", "in_both_alg1", \
-                                                                                    "in_both_alg2".'
-    if noise=='only_in_exp':
+    if MTD_th is None:
         MTD_max = MTD
-    elif (noise=='in_both_alg1' or noise=='in_both_alg2'):
+    else:
         MTD_max = max(MTD, MTD_th)
 
     for i, q in enumerate(query):
@@ -761,11 +774,9 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8,
                     if rerun > max_reruns:
                             raise RuntimeError('Failed to deconvolve a fragment of the experimental spectrum \
                                                 with mass (%f, %f)' % chunk_bounds[current_chunk_ID])
-                    if noise == "only_in_exp":
-                        dec = dualdeconv2_alternative(chunkSp, thrSp, MTD, quiet=True)
-                    if noise == "in_both_alg1":
-                        dec = dualdeconv3(chunkSp, thrSp, MTD, MTD_th, quiet=True)
-                    if noise == "in_both_alg2":
+                    if MTD_th is None:
+                        dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True)
+                    else:
                         dec = dualdeconv4(chunkSp, thrSp, MTD, MTD_th, quiet=True)
                     if dec['status'] == 1:
                             success=True
@@ -777,7 +788,7 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8,
                     print('Signal proportion in experimental spectrum:', sum(dec['probs']))
                     print('Noise proportion in experimental spectrum:', sum(dec['trash']))
                     print('Total explanation:', sum(dec['probs'])+sum(dec['trash']))
-                    if noise == "in_both_alg1" or noise == "in_both_alg2":
+                    if MTD_th is not None:
                         print('Noise proportion in combination of theoretical spectra:', dec["noise_in_theoretical"])
             for i, p in enumerate(dec['probs']):
                 original_thr_spectrum_ID = theoretical_spectra_IDs[i]
@@ -785,23 +796,22 @@ def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8,
             for i, p in enumerate(dec['trash']):
                 original_conf_id = conf_IDs[i]
                 vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
-            if noise == "in_both_alg1" or noise == "in_both_alg2":
+            if MTD_th is not None:
                 p0_prime = p0_prime + dec["noise_in_theoretical"]*chunk_TICs[current_chunk_ID]
                 rescaled_vortex_th = [element*chunk_TICs[current_chunk_ID] for element in dec['theoretical_trash']]
                 vortex_th = vortex_th + rescaled_vortex_th
                 global_mass_axis = global_mass_axis + dec['global_mass_axis']
-                #vortex_th.append(rescaled_vortex_th)
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
-        warn("""In estimate_proportions2:
+        warn("""In estimate_proportions:
 Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                         """ % (sum(proportions)+sum(vortex)))
-    if noise == 'in_both_alg1' or noise == 'in_both_alg2':
+    if MTD_th is not None:
         return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': vortex_th, 
                 'proportion_of_noise_in_theoretical': p0_prime, 'global_mass_axis': global_mass_axis}
-    if noise == 'only_in_exp':
+    else:
         return {'proportions': proportions, 'noise': vortex}
 
 
