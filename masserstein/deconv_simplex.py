@@ -35,10 +35,32 @@ def intensity_generator(confs, mzaxis):
 
 def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         """
-        Different formulation, maybe faster
-        exp_sp: experimental spectrum
-        thr_sp: list of theoretical spectra
-        penalty: denoising penalty
+        This function solves linear program describing optimal transport of signal between the experimental spectrum
+        and the list of theoretical (reference) spectra. Additionally, an auxiliary point is introduced in order to
+        remove noise from the experimental spectrum, as described by Ciach et al., 2020. 
+
+        _____
+        Parameters:
+            exp_sp: Spectrum object
+                Experimental spectrum.
+            thr_sp: list of Spectrum objects
+                List of theoretical (reference) spectra.
+            penalty: float
+                Denoising penalty.
+
+        _____
+        Returns: dict
+            Dictionary with the following entries:
+
+            - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
+            spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
+
+            - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
+
+            - fun: Optimal value of the objective function.
+
+            - status: Status of the linear program.
+
         """
         start = time()
         exp_confs = exp_sp.confs.copy()
@@ -126,12 +148,38 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
 
 
 def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
+
         """
-        Alternative version of dualdeconv2 - using .pi instead of .dj.
-        exp_sp: experimental spectrum
-        thr_sp: list of theoretical spectra
-        penalty: denoising penalty
+        Alternative version of dualdeconv2 - using .pi instead of .dj to extract optimal values of variables.
+        Slower, but .pi is better documented than .dj in pulp. Gives the same results as dualdeconv2.
+        This function solves linear program describing optimal transport of signal between the experimental spectrum
+        and the list of theoretical (reference) spectra. Additionally, an auxiliary point is introduced in order to
+        remove noise from the experimental spectrum, as described by Ciach et al., 2020. 
+
+        _____
+        Parameters:
+            exp_sp: Spectrum object
+                Experimental spectrum.
+            thr_sp: list of Spectrum objects
+                List of theoretical (reference) spectra.
+            penalty: float
+                Denoising penalty.
+
+        _____
+        Returns: dict
+            Dictionary with the following entries:
+
+            - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
+            spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
+
+            - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
+
+            - fun: Optimal value of the objective function.
+
+            - status: Status of the linear program.
+
         """
+
         start = time()
         exp_confs = exp_sp.confs.copy()
         thr_confs = [thr_sp.confs.copy() for thr_sp in thr_sps]
@@ -217,13 +265,51 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
 
 
 def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
+
         """
-        Solving linear problem with noise in theoretical spectra. Transporting signal between two auxiliary points is forbidden.
-        exp_sp: experimental spectrum
-        thr_sp: list of theoretical spectra
-        penalty: denoising penalty for experimental spectra
-        penalty_th: denoising penalty for theoretical spectra
+        This function solves linear program describing optimal transport of signal between 
+        the experimental spectrum and the list of theoretical (reference) spectra. 
+        Two auxiliary points are introduced in order to remove noise from the experimental spectrum
+        and from the combination of theoretical (reference) spectra, as described by Domżał et al., 2022. 
+        Transport of signal between the two auxiliary points is explicitly forbidden.
+        Mathematically, this formulation is equivalent to the one implemented in dualdeconv4
+        and both give the same results up to roundoff errors.
+
+        _____
+        Parameters:
+            exp_sp: Spectrum object
+                Experimental spectrum.
+            thr_sp: Spectrum object
+                List of theoretical (reference) spectra.
+            penalty: float
+                Denoising penalty for the experimental spectrum.
+            penalty_th: float
+                Denoising penalty for the theoretical (reference) spectra.
+
+        _____
+        Returns: dict
+            Dictionary with the following entries:
+
+            - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
+            spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
+
+            - noise_in_theoretical: Proportion of noise present in the combination of theoretical
+            (reference) spectra.
+
+            - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
+
+            - theoretical trash: Amount of noise present in the combination of theoretical (reference)
+            spectra in consecutive m/z points from global mass axis.
+
+            - fun: Optimal value of the objective function.
+
+            - status: Status of the linear program.
+
+            - global mass axis: All the m/z values from the experimental spectrum and from the theoretical 
+            (reference) spectra in a sorted list. 
+
         """
+
         start = time()
         exp_confs = exp_sp.confs.copy()
         thr_confs = [thr_sp.confs.copy() for thr_sp in thr_sps]
@@ -256,9 +342,12 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         # variables:
         lpVars = []
-        for i in range(n-2):
-                lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
+        try:
+                for i in range(n-2):
+                        lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
+                lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
+        except IndexError:
+                pass
         lpVars.append(lp.LpVariable('Z%i' % (n), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
@@ -269,15 +358,18 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 0, -1], lpVars[n-1:]))), 'Dual_objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(
+                                lp.lpSum(v*x for v, x in zip([-1, 0, 0, -1], lpVars[n-1:]))), 'Dual_objective'
 
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1, -1], lpVars[n-1:]))) <= 0, 'P_%i' % (j+1)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(
+                                lp.lpSum(v*x for v, x in zip([-1, 0, 1, -1], lpVars[n-1:]))) <= 0, 'P_%i' % (j+1)
 
         exp_vec = intensity_generator(exp_confs, global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, 1, -1, 0], lpVars[n-1:]))) <= 0, 'p0_prime'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(
+                                lp.lpSum(v*x for v, x in zip([0, 1, -1, 0], lpVars[n-1:]))) <= 0, 'p0_prime'
 
         if not quiet:
                 print('tsk tsk')
@@ -285,9 +377,12 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         for i in range(n-1):
                 program +=  lpVars[i] - lpVars[n-1]  <=  penalty, 'g_%i' % (i+1)
                 program +=  -lpVars[n] - lpVars[i] <= penalty_th, 'g_prime_%i' % (i+1)
-        for i in range(n-2):
-                program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
-                program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
+        try:
+                for i in range(n-2):
+                        program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
+                        program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
+        except IndexError:
+                pass
 
         program += -lpVars[n-1] <= penalty, 'g_%i' % (n)
         program += -lpVars[n] <= penalty_th, 'g_prime_%i' % (n)
@@ -321,17 +416,56 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 Please check the deconvolution results and consider reporting this warning to the authors.
                                     """ % (sum(probs)+sum(abyss)))
 
-        return {"probs": probs, "noise_in_theoretical": p0_prime, "trash": abyss, "theoretical_trash": abyss_th, "fun": lp.value(program.objective), 'status': program.status}
+        return {"probs": probs, "noise_in_theoretical": p0_prime, "trash": abyss, "theoretical_trash": abyss_th,
+         "fun": lp.value(program.objective), 'status': program.status, 'global_mass_axis': global_mass_axis}
 
 
 def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
+
         """
-        Solving linear problem with noise in theoretical spectra. Transporting noise between two auxiliary points is allowed.
-        exp_sp: experimental spectrum
-        thr_sp: list of theoretical spectra
-        penalty: denoising penalty for experimental spectra
-        penalty_th: denoising penalty for theoretical spectra
+        This function solves linear program describing optimal transport of signal between the experimental 
+        spectrum and the list of theoretical (reference) spectra. 
+        Two auxiliary points are introduced in order to remove noise from the experimental spectrum
+        and from the combination of theoretical (reference) spectra, as described by Domżał et al., 2022. 
+        Transport of signal between the two auxiliary points is allowed (with cost equal to penalty + penalty_th),
+        however, it is not optimal so it never occurs. Mathematically, this formulation is equivalent to the one 
+        implemented in dualdeconv3 and both give the same results up to roundoff errors.
+
+        _____
+        Parameters:
+            exp_sp: Spectrum object
+                Experimental spectrum.
+            thr_sp: Spectrum object
+                List of theoretical (reference) spectra.
+            penalty: float
+                Denoising penalty for the experimental spectrum.
+            penalty_th: float
+                Denoising penalty for the theoretical (reference) spectra.
+        
+        _____
+        Returns: dict
+            Dictionary with the following entries:
+
+            - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
+            spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
+
+            - noise_in_theoretical: Proportion of noise present in the combination of theoretical
+            (reference) spectra.
+
+            - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
+
+            - theoretical trash: Amount of noise present in the combination of theoretical (reference)
+            spectra in consecutive m/z points from global mass axis.
+
+            - fun: Optimal value of the objective function.
+
+            - status: Status of the linear program.
+
+            - global mass axis: All the m/z values from the experimental spectrum and from the theoretical 
+            (reference) spectra in a sorted list. 
+
         """
+
         start = time()
         exp_confs = exp_sp.confs.copy()
         thr_confs = [thr_sp.confs.copy() for thr_sp in thr_sps]
@@ -364,9 +498,12 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         # variables:
         lpVars = []
-        for i in range(n-2):
-                lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
-        lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
+        try:
+                for i in range(n-2):
+                        lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
+                lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
+        except IndexError:
+                pass
         lpVars.append(lp.LpVariable('Z%i' % n, None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+2), 0, None, lp.LpContinuous))
@@ -376,15 +513,18 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         # objective function:
         exp_vec = intensity_generator(exp_confs, global_mass_axis)  # generator of experimental intensity observations
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 0, -1], lpVars[n-1:]))), 'Dual_objective'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(
+                            lp.lpSum(v*x for v, x in zip([-1, 0, 0, -1], lpVars[n-1:]))), 'Dual_objective'
 
         # constraints:
         for j in range(k):
                 thr_vec = intensity_generator(thr_confs[j], global_mass_axis)
-                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1, -1], lpVars[n-1:]))) <= -penalty, 'P_%i' % (j+1)
+                program += lp.lpSum(v*x for v, x in zip(thr_vec, lpVars[:n-1]+[0]) if v > 0.).addInPlace(
+                            lp.lpSum(v*x for v, x in zip([-1, 0, 1, -1], lpVars[n-1:]))) <= -penalty, 'P_%i' % (j+1)
 
         exp_vec = intensity_generator(exp_confs, global_mass_axis)
-        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(lp.lpSum(v*x for v, x in zip([0, 1, -1, 0], lpVars[n-1:]))) <= penalty_th, 'p0_prime'
+        program += lp.lpSum(v*x for v, x in zip(exp_vec, lpVars[:n-1]+[0])).addInPlace(
+                            lp.lpSum(v*x for v, x in zip([0, 1, -1, 0], lpVars[n-1:]))) <= penalty_th, 'p0_prime'
 
         if not quiet:
                 print('tsk tsk')
@@ -392,9 +532,12 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
         for i in range(n-1):
                 program +=  lpVars[i] - lpVars[n-1]  <=  0, 'g_%i' % (i+1)
                 program +=  -lpVars[i] - lpVars[n]  <= 0, 'g_prime_%i' % (i+1)
-        for i in range(n-2):
-                program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
-                program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
+        try:
+                for i in range(n-2):
+                        program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
+                        program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
+        except IndexError:
+                pass
 
         program += -lpVars[n-1] <= 0, 'g_%i' % (n)
         program += -lpVars[n] <= 0, 'g_prime_%i' % (n)
@@ -427,252 +570,74 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 Please check the deconvolution results and consider reporting this warning to the authors.
                                     """ % (sum(probs)+sum(abyss)))
 
-        return {"probs": probs, "noise_in_theoretical": p0_prime, "trash": abyss, "theoretical_trash": abyss_th, "fun": lp.value(program.objective), 'status': program.status}
+        return {"probs": probs, "noise_in_theoretical": p0_prime, "trash": abyss, "theoretical_trash": abyss_th, 
+        "fun": lp.value(program.objective)+penalty, 'status': program.status, 'global_mass_axis': global_mass_axis}
 
 
-def estimate_proportions(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False, progress=True):
+def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
+                        MMD=-1, max_reruns=3, verbose=False, 
+                        progress=True, MTD_th=None):
+
     """
     Returns estimated proportions of molecules from query in spectrum.
-    Performs initial filtering of formulas and experimental spectrum to speed
-    up the computations.
-    _____
-    Parameters:
+    Performs initial filtering of formulas and experimental spectrum to speed up the computations.
 
-    spectrum: Spectrum object
-        The experimental (subject) spectrum.
-    query: list of Spectrum objects
-        A list of theoretical (query) spectra.
-    MTD: Maximum Transport Distance, float
-        Ion current will be transported up to this distance when estimating
-        molecule proportions.
-    MDC: Minimum Detectable Current, float
-        If the isotopic envelope of an ion encompasses less than
-        this amount of the total ion current, it is assumed that this ion
-        is absent in the spectrum.
-    MMD: Maximum Mode Distance, float
-        If there is no experimental peak within this distance from the
-        highest peak of an isotopic envelope of a molecule,
-        it is assumed that this molecule is absent in the spectrum.
-        Setting this value to -1 disables filtering.
-    TSC: Theoretical Spectrum Coverage, float in [0, 1]
-        The peak intensities in any theoretical spectrum will sum up to this value.
-        Setting this value to 1 means that all theoretical peaks are computed,
-        which is in general undesirable.
-    max_reruns: int
-        Due to numerical errors, some partial results may be inaccurate.
-        If this is detected, then those results are recomputed for a maximal number of times
-        given by this parameter.
-    verbose: bool
-        Print diagnistic messages?
-    progress: bool
-        Whether to display progress bars during work.
-    _____
-    Returns: dict
-        A dictionary with entry 'proportions', storing a list of proportions of query spectra,
-        and 'noise', storing a list of intensities that could not be
-        explained by the supplied formulas. The intensities correspond
-        to the m/z values of experimental spectrum.
-    """
-    def progr_bar(x, **kwargs):
-        if progress:
-            return tqdm(x, **kwargs)
-        else:
-            return x
-    try:
-        exp_confs = spectrum.confs
-    except:
-        print("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?")
-        raise
-    assert abs(sum(x[1] for x in exp_confs) - 1.) < 1e-08, 'The experimental spectrum is not normalized.'
-    assert all(x[0] >= 0. for x in exp_confs), 'Found experimental peaks with negative masses!'
-    if any(x[1] < 0 for x in exp_confs):
-        raise ValueError("""
-        The experimental spectrum cannot contain negative intensities. 
-        Please remove them using e.g. the Spectrum.trim_negative_intensities() method.
-        """)
-                           
-    vortex = [0.]*len(exp_confs)  # unxplained signal
-    k = len(query)
-    proportions = [0.]*k
-
-    for i, q in enumerate(query):
-        assert abs(sum(x[1] for x in q.confs) - 1.) < 1e-08, 'Theoretical spectrum %i is not normalized' %i
-        assert all(x[0] >= 0 for x in q.confs), 'Theoretical spectrum %i has negative masses!' % i
-
-    # Initial filtering of formulas
-    envelope_bounds = []
-    filtered = []
-    for i in progr_bar(range(k), desc = "Initial filtering of formulas"):
-        s = query[i]
-        mode = s.get_modal_peak()[0]
-        mn = s.confs[0][0]
-        mx = s.confs[-1][0]
-        matching_current = MDC==0. or sum(x[1] for x in misc.extract_range(exp_confs, mn - MTD, mx + MTD)) >= MDC
-        matching_mode = MMD==-1 or abs(misc.closest(exp_confs, mode)[0] - mode) <= MMD
-
-        if matching_mode and matching_current:
-            envelope_bounds.append((mn, mx, i))
-        else:
-            envelope_bounds.append((-1, -1, i))
-            filtered.append(i)
-
-    envelope_bounds.sort(key=lambda x: x[0])  # sorting by lower bounds
-    if verbose:
-        print("Removed theoretical spectra due to no matching experimental peaks:", filtered)
-        print('Envelope bounds:', envelope_bounds)
-
-    # Computing chunks
-    chunkIDs = [0]*k  # Grouping of theoretical spectra
-    # Note: order of chunkIDs corresponds to order of query, not the envelope bounds
-    # chunk_bounds = mass intervals matching chunks, accounting for mass transport
-    # order of chunk_bounds corresponds to increasing chunk ID,
-    # so that chunk_bounds[0] is the interval for chunk nr 0
-    chunk_bounds = []
-    current_chunk = 0
-    first_present = 0
-    while envelope_bounds[first_present][0] == -1 and first_present < k-1:
-        _, _, sp_id = envelope_bounds[first_present]
-        chunkIDs[sp_id] = -1
-        first_present += 1
-    prev_mn, prev_mx, prev_id = envelope_bounds[first_present]
-    for i in progr_bar(range(first_present, k), desc = "Computing chunks"):
-        mn, mx, sp_id = envelope_bounds[i]
-        if mn - prev_mx > 2*MTD:
-            current_chunk += 1
-            chunk_bounds.append( (prev_mn-MTD, prev_mx+MTD) )
-            prev_mn = mn  # get lower bound of new chunk
-        prev_mx = mx  # update the lower bound of current chunk
-        chunkIDs[sp_id] = current_chunk
-    chunk_bounds.append( (prev_mn-MTD, prev_mx+MTD) )
-    nb_of_chunks = len(chunk_bounds)
-    if verbose:
-        print('Number of chunks: %i' % nb_of_chunks)
-        print("ChunkIDs:", chunkIDs)
-        print("Chunk bounds:", chunk_bounds)
-
-    # Splitting the experimental spectrum into chunks
-    exp_conf_chunks = []  # list of indices of experimental confs matching chunks
-    current_chunk = 0
-    matching_confs = []  # experimental confs matching current chunk
-    cur_bound = chunk_bounds[current_chunk]
-    for conf_id, cur_conf in progr_bar(enumerate(exp_confs), desc = "Splitting the experimental spectrum into chunks"):
-        while cur_bound[1] < cur_conf[0] and current_chunk < nb_of_chunks-1:
-            exp_conf_chunks.append(matching_confs)
-            matching_confs = []
-            current_chunk += 1
-            cur_bound = chunk_bounds[current_chunk]
-        if cur_bound[0] <= cur_conf[0] <= cur_bound[1]:
-            matching_confs.append(conf_id)
-        else:
-            # experimental peaks outside chunks go straight to vortex
-            vortex[conf_id] = cur_conf[1]
-    exp_conf_chunks.append(matching_confs)
-    chunk_TICs = [sum(exp_confs[i][1] for i in chunk_list) for chunk_list in exp_conf_chunks]
-    if verbose:
-        # print('Trash after filtering:', vortex)
-        print("Ion currents in chunks:", chunk_TICs)
-
-    # Deconvolving chunks:
-    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", total=len(exp_conf_chunks)):
-        if verbose:
-            print("Deconvolving chunk %i" % current_chunk_ID)
-        if chunk_TICs[current_chunk_ID] < 1e-16:
-            # nothing to deconvolve, pushing remaining signal to vortex
-            if verbose:
-                print('Chunk %i is almost empty - skipping deconvolution' % current_chunk_ID)
-            for i in conf_IDs:
-                vortex[i] = exp_confs[i][1]
-        else:
-            chunkSp = Spectrum('', empty=True)
-            # Note: conf_IDs are monotonic w.r.t. conf mass,
-            # so constructing a spectrum will not change the order
-            # of confs supplied in the list below:
-            chunkSp.set_confs([exp_confs[i] for i in conf_IDs])
-            chunkSp.normalize()
-            theoretical_spectra_IDs = [i for i, c in enumerate(chunkIDs) if c == current_chunk_ID]
-            thrSp = [query[i] for i in theoretical_spectra_IDs]
-
-            rerun = 0
-            success = False
-            while not success:
-                    rerun += 1
-                    if rerun > max_reruns:
-                            raise RuntimeError('Failed to deconvolve a fragment of the experimental spectrum with mass (%f, %f)' % chunk_bounds[current_chunk_ID])
-                    dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True)
-                    if dec['status'] == 1:
-                            success=True
-                    else:
-                            warn('Rerunning computations for chunk %i due to status %s' % (current_chunk_ID, lp.LpStatus[dec['status']]))
-            if verbose:
-                    print('Chunk %i deconvolution status:', lp.LpStatus[dec['status']])
-                    print('Signal proportion:', sum(dec['probs']))
-                    print('Noise proportion:', sum(dec['trash']))
-                    print('Total explanation:', sum(dec['probs'])+sum(dec['trash']))
-            for i, p in enumerate(dec['probs']):
-                original_thr_spectrum_ID = theoretical_spectra_IDs[i]
-                proportions[original_thr_spectrum_ID] = p*chunk_TICs[current_chunk_ID]
-            for i, p in enumerate(dec['trash']):
-                original_conf_id = conf_IDs[i]
-                vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
-
-    if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
-        warn("""In estimate_proportions:
-Proportions of signal and noise sum to %f instead of 1.
-This may indicate improper results.
-Please check the deconvolution results and consider reporting this warning to the authors.
-                        """ % (sum(proportions)+sum(vortex)))
-    return {'proportions': proportions, 'noise': vortex}
-
-
-def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=3, verbose=False, progress=True, noise="in_both_alg1", MTD_th=1.):
-    """
-    Returns estimated proportions of molecules from query in spectrum.
-    Performs initial filtering of formulas and experimental spectrum to speed
-    up the computations.
     _____
     Parameters:
     spectrum: Spectrum object
         The experimental (subject) spectrum.
     query: list of Spectrum objects
-        A list of theoretical (query) spectra.
+        A list of theoretical (reference) spectra.
     MTD: Maximum Transport Distance, float
-        Ion current will be transported up to this distance when estimating
-        molecule proportions.
+        Ion current from experimental spectrum will be transported up to this distance when estimating
+        molecule proportions. Default is 1.
     MDC: Minimum Detectable Current, float
         If the isotopic envelope of an ion encompasses less than
         this amount of the total ion current, it is assumed that this ion
-        is absent in the spectrum.
+        is absent in the spectrum. Default is 1e-8.
     MMD: Maximum Mode Distance, float
         If there is no experimental peak within this distance from the
         highest peak of an isotopic envelope of a molecule,
         it is assumed that this molecule is absent in the spectrum.
-        Setting this value to -1 disables filtering.
-    TSC: Theoretical Spectrum Coverage, float in [0, 1]
-        The peak intensities in any theoretical spectrum will sum up to this value.
-        Setting this value to 1 means that all theoretical peaks are computed,
-        which is in general undesirable.
+        Setting this value to -1 disables filtering. Default is -1.
     max_reruns: int
         Due to numerical errors, some partial results may be inaccurate.
         If this is detected, then those results are recomputed for a maximal number of times
-        given by this parameter.
+        given by this parameter. Default is 3.
     verbose: bool
-        Print diagnistic messages?
+        Print diagnistic messages? Default is False.
     progress: bool
-        Whether to display progress bars during work.
-    noise: string
-        One of: "only_in_exp", "in_both_alg1", "in_both_alg2". Choose "only_in_exp" if you expect noise only in experimental spectra.
-        Choose "in_both_alg1"/"in_both_alg2" if you expect noise in theoretical spectra as well.
-        Choosing "in_both_alg1" forbids transporting signal between two auxiliary points, choosing "in_both_alg2" does not.
-        If you decide to choose "in_both_alg1" or "in_both_alg2" you have to set the value of MTD_th.
+        Whether to display progress bars during work. Default is True.
     MTD_th: Maximum Transport Distance for theoretical spectra, float
-        This argument must be specified if you set noise to "in_both_alg1" or "in_both_alg2".
+        If presence of noise in theoretical (reference, query) spectra is not expected, 
+        then this parameter should be set to None. Otherwise, set its value to some positive real number.
+        Ion current from theoretical spectra will be transported up to this distance 
+        when estimating molecule proportions. Default is None.
+
     _____
     Returns: dict
-        A dictionary with entry 'proportions', storing a list of proportions of query spectra,
-        and 'noise', storing a list of intensities that could not be
-        explained by the supplied formulas. The intensities correspond
-        to the m/z values of experimental spectrum.
+        A dictionary with the following entries:
+
+        - proportions: List of proportions of query (i.e. theoretical, reference) spectra.
+
+        - noise: List of intensities that could not be explained by the supplied formulas. 
+        The intensities correspond to the m/z values of the experimental spectrum.
+
+        If MTD_th parameter is not equal to None, then the dictionary contains also 
+        the following entries:
+
+        - noise_in_theoretical: List of intensities from query (i.e. theoretical, reference) spectra
+        that do not correspond to any intensities in the experimental spectrum and therefore were 
+        identified as noise. The intensities correspond to the m/z values from global mass axis.
+
+        - proportion_of_noise_in_theoretical: Proportion of noise present in the combination of query
+        (i.e. theoretical, reference) spectra.
+
+        - global_mass_axis: All the m/z values from the experimental spectrum and from the query 
+        (i.e. theoretical, reference) spectra in a sorted list. 
+
     """
+
     def progr_bar(x, **kwargs):
         if progress:
             return tqdm(x, **kwargs)
@@ -691,9 +656,14 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
         Please remove them using e.g. the Spectrum.trim_negative_intensities() method.
         """)
                            
-    vortex = [0.]*len(exp_confs)  # unxplained signal
+    vortex = [0.]*len(exp_confs)  # unexplained signal
     k = len(query)
     proportions = [0.]*k
+
+    if MTD_th is None:
+        MTD_max = MTD
+    else:
+        MTD_max = max(MTD, MTD_th)
 
     for i, q in enumerate(query):
         assert abs(sum(x[1] for x in q.confs) - 1.) < 1e-08, 'Theoretical spectrum %i is not normalized' %i
@@ -707,7 +677,8 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
         mode = s.get_modal_peak()[0]
         mn = s.confs[0][0]
         mx = s.confs[-1][0]
-        matching_current = MDC==0. or sum(x[1] for x in misc.extract_range(exp_confs, mn - MTD, mx + MTD)) >= MDC
+        matching_current = MDC==0. or sum(x[1] for x in misc.extract_range(
+                                                                        exp_confs, mn - MTD_max, mx + MTD_max)) >= MDC
         matching_mode = MMD==-1 or abs(misc.closest(exp_confs, mode)[0] - mode) <= MMD
 
         if matching_mode and matching_current:
@@ -737,13 +708,13 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
     prev_mn, prev_mx, prev_id = envelope_bounds[first_present]
     for i in progr_bar(range(first_present, k), desc = "Computing chunks"):
         mn, mx, sp_id = envelope_bounds[i]
-        if mn - prev_mx > 2*MTD:
+        if mn - prev_mx > 2*MTD_max:
             current_chunk += 1
-            chunk_bounds.append( (prev_mn-MTD, prev_mx+MTD) )
+            chunk_bounds.append( (prev_mn-MTD_max, prev_mx+MTD_max) )
             prev_mn = mn  # get lower bound of new chunk
         prev_mx = mx  # update the lower bound of current chunk
         chunkIDs[sp_id] = current_chunk
-    chunk_bounds.append( (prev_mn-MTD, prev_mx+MTD) )
+    chunk_bounds.append( (prev_mn-MTD_max, prev_mx+MTD_max) )
     nb_of_chunks = len(chunk_bounds)
     if verbose:
         print('Number of chunks: %i' % nb_of_chunks)
@@ -775,7 +746,9 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
     # Deconvolving chunks:
     p0_prime = 0
     vortex_th = []
-    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", total=len(exp_conf_chunks)):
+    global_mass_axis = []
+    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", 
+                                                                            total=len(exp_conf_chunks)):
         if verbose:
             print("Deconvolving chunk %i" % current_chunk_ID)
         if chunk_TICs[current_chunk_ID] < 1e-16:
@@ -799,23 +772,23 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
             while not success:
                     rerun += 1
                     if rerun > max_reruns:
-                            raise RuntimeError('Failed to deconvolve a fragment of the experimental spectrum with mass (%f, %f)' % chunk_bounds[current_chunk_ID])
-                    if noise == "only_in_exp":
-                        dec = dualdeconv2_alternative(chunkSp, thrSp, MTD, quiet=True)
-                    if noise == "in_both_alg1":
-                        dec = dualdeconv3(chunkSp, thrSp, MTD, MTD_th, quiet=True)
-                    if noise == "in_both_alg2":
+                            raise RuntimeError('Failed to deconvolve a fragment of the experimental spectrum \
+                                                with mass (%f, %f)' % chunk_bounds[current_chunk_ID])
+                    if MTD_th is None:
+                        dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True)
+                    else:
                         dec = dualdeconv4(chunkSp, thrSp, MTD, MTD_th, quiet=True)
                     if dec['status'] == 1:
                             success=True
                     else:
-                            warn('Rerunning computations for chunk %i due to status %s' % (current_chunk_ID, lp.LpStatus[dec['status']]))
+                            warn('Rerunning computations for chunk %i due to status %s' % (current_chunk_ID, 
+                                                                                        lp.LpStatus[dec['status']]))
             if verbose:
                     print('Chunk %i deconvolution status:', lp.LpStatus[dec['status']])
                     print('Signal proportion in experimental spectrum:', sum(dec['probs']))
                     print('Noise proportion in experimental spectrum:', sum(dec['trash']))
                     print('Total explanation:', sum(dec['probs'])+sum(dec['trash']))
-                    if noise == "in_both_alg1" or noise == "in_both_alg2":
+                    if MTD_th is not None:
                         print('Noise proportion in combination of theoretical spectra:', dec["noise_in_theoretical"])
             for i, p in enumerate(dec['probs']):
                 original_thr_spectrum_ID = theoretical_spectra_IDs[i]
@@ -823,20 +796,22 @@ def estimate_proportions2(spectrum, query, MTD=1., MDC=1e-8, MMD=-1, max_reruns=
             for i, p in enumerate(dec['trash']):
                 original_conf_id = conf_IDs[i]
                 vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
-            if noise == "in_both_alg1" or noise == "in_both_alg2":
-            	p0_prime = p0_prime + dec["noise_in_theoretical"]*chunk_TICs[current_chunk_ID]
-            	rescaled_vortex_th = [element*chunk_TICs[current_chunk_ID] for element in dec['theoretical_trash']]
-            	vortex_th = vortex_th + rescaled_vortex_th
+            if MTD_th is not None:
+                p0_prime = p0_prime + dec["noise_in_theoretical"]*chunk_TICs[current_chunk_ID]
+                rescaled_vortex_th = [element*chunk_TICs[current_chunk_ID] for element in dec['theoretical_trash']]
+                vortex_th = vortex_th + rescaled_vortex_th
+                global_mass_axis = global_mass_axis + dec['global_mass_axis']
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
-        warn("""In estimate_proportions2:
+        warn("""In estimate_proportions:
 Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                         """ % (sum(proportions)+sum(vortex)))
-    if noise == "in_both_alg1" or noise == "in_both_alg2":
-        return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': vortex_th, 'proportion_of_noise_in_theoretical': p0_prime}
-    if noise == "only_in_exp":
+    if MTD_th is not None:
+        return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': vortex_th, 
+                'proportion_of_noise_in_theoretical': p0_prime, 'global_mass_axis': global_mass_axis}
+    else:
         return {'proportions': proportions, 'noise': vortex}
 
 
