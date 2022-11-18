@@ -2,7 +2,7 @@
 This repository contains software tools which allow to compare spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
 
 The tools are distributed as a Python3 package called `masserstein`. The package contains functions for generating spectra from chemical formulas, basic processing (centroiding, smoothing), and fitting combinations of reference spectra of analytes to a spectrum of their mixture.  
-Examples of use of the package functions are shown in the tutorials available on this repository.  
+Example uses of the package are shown in the tutorials available on this repository.  
 
 If you encounter any difficulties during installation or usage of these programs, or if you have any suggestions regarding their functionality, please post a GitHub issue or send an email to m.ciach@mimuw.edu.pl. 
 
@@ -15,8 +15,8 @@ The simplest way to install `masserstein` is to use the `pip` tool in the comman
 pip install masserstein
 ```
 
-However, this may not be the latest version of the package.  
-To get the latest version, download or clone this repository. In the commandline, this can be done by typing:
+This will install the latest stable release of the package.  
+To get the development version, clone this repository. In the commandline, this can be done by typing:
 
 ```
 git clone https://github.com/mciach/wassersteinms.git
@@ -29,7 +29,7 @@ python3 setup.py install --user
 ```
 
 This will install the `masserstein` package for the current user.  
-You will also need to have the following packages installed (all availiable on PIP):
+You will also need to have the following packages installed (all availiable on PyPI or via pip):
 
 * `IsoSpecPy`
 * `numpy`
