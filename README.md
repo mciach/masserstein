@@ -29,7 +29,7 @@ python3 setup.py install --user
 ```
 
 This will install the `masserstein` package for the current user.  
-You will also need to have the following packages installed (all availiable on PyPI or via pip):
+You will also need to have the following packages installed (all availiable via pip):
 
 * `IsoSpecPy`
 * `numpy`
