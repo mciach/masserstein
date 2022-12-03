@@ -33,7 +33,7 @@ def intensity_generator(confs, mzaxis):
                 yield 0.
 
 
-def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
+def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolverDefault):
         """
         This function solves linear program describing optimal transport of signal between the experimental spectrum
         and the list of theoretical (reference) spectra. Additionally, an auxiliary point is introduced in order to
@@ -47,6 +47,10 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
                 List of theoretical (reference) spectra.
             penalty: float
                 Denoising penalty.
+            solver: 
+                Which solver should be used. In case of problems with the default solver,
+                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
 
         _____
         Returns: dict
@@ -123,7 +127,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         if not quiet:
                 print("Starting solver")
         LpSolverDefault.msg = not quiet
-        program.solve(solver = LpSolverDefault)
+        program.solve(solver = solver)
         end = time()
         if not quiet:
                 print("Solver finished.")
@@ -147,7 +151,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True):
         return {"probs": probs, "trash": abyss, "fun": lp.value(program.objective), 'status': program.status}
 
 
-def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
+def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolverDefault):
 
         """
         Alternative version of dualdeconv2 - using .pi instead of .dj to extract optimal values of variables.
@@ -164,6 +168,10 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
                 List of theoretical (reference) spectra.
             penalty: float
                 Denoising penalty.
+            solver: 
+                Which solver should be used. In case of problems with the default solver,
+                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
 
         _____
         Returns: dict
@@ -240,7 +248,7 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
         if not quiet:
                 print("Starting solver")
         LpSolverDefault.msg = not quiet
-        program.solve(solver = LpSolverDefault)
+        program.solve(solver = solver)
         end = time()
         if not quiet:
                 print("Solver finished.")
@@ -264,7 +272,7 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True):
 
 
 
-def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
+def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolverDefault):
 
         """
         This function solves linear program describing optimal transport of signal between 
@@ -285,6 +293,10 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 Denoising penalty for the experimental spectrum.
             penalty_th: float
                 Denoising penalty for the theoretical (reference) spectra.
+            solver: 
+                Which solver should be used. In case of problems with the default solver,
+                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
 
         _____
         Returns: dict
@@ -395,7 +407,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         #Solving
         LpSolverDefault.msg = not quiet
-        program.solve(solver = LpSolverDefault)
+        program.solve(solver = solver)
         end = time()
         if not quiet:
                 print("Solver finished.")
@@ -420,7 +432,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
          "fun": lp.value(program.objective), 'status': program.status, 'global_mass_axis': global_mass_axis}
 
 
-def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
+def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolverDefault):
 
         """
         This function solves linear program describing optimal transport of signal between the experimental 
@@ -441,6 +453,10 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
                 Denoising penalty for the experimental spectrum.
             penalty_th: float
                 Denoising penalty for the theoretical (reference) spectra.
+            solver: 
+                Which solver should be used. In case of problems with the default solver,
+                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
         
         _____
         Returns: dict
@@ -550,7 +566,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
         #Solving
         LpSolverDefault.msg = not quiet
-        program.solve(solver = LpSolverDefault)
+        program.solve(solver = solver)
         end = time()
         if not quiet:
                 print("Solver finished.")
@@ -576,7 +592,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True):
 
 def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
                         MMD=-1, max_reruns=3, verbose=False, 
-                        progress=True, MTD_th=None):
+                        progress=True, MTD_th=None, solver=LpSolverDefault):
 
     """
     Returns estimated proportions of molecules from query in spectrum.
@@ -613,6 +629,10 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
         then this parameter should be set to None. Otherwise, set its value to some positive real number.
         Ion current from theoretical spectra will be transported up to this distance 
         when estimating molecule proportions. Default is None.
+    solver: 
+        Which solver should be used. In case of problems with the default solver,
+        pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+        To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
 
     _____
     Returns: dict
@@ -775,9 +795,9 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
                             raise RuntimeError('Failed to deconvolve a fragment of the experimental spectrum \
                                                 with mass (%f, %f)' % chunk_bounds[current_chunk_ID])
                     if MTD_th is None:
-                        dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True)
+                        dec = dualdeconv2(chunkSp, thrSp, MTD, quiet=True, solver=solver)
                     else:
-                        dec = dualdeconv4(chunkSp, thrSp, MTD, MTD_th, quiet=True)
+                        dec = dualdeconv4(chunkSp, thrSp, MTD, MTD_th, quiet=True, solver=solver)
                     if dec['status'] == 1:
                             success=True
                     else:
