@@ -575,6 +575,7 @@ class Spectrum:
 
     def fuzzify_peaks(self, sd, step):
         """
+        LEGACY FUNCTION. USE SELF.GAUSSIAN_SMOOTING INSTEAD.   
         Applies a gaussian filter to the peaks, effectively broadening them
         and simulating low resolution. Works in place, modifying self.
         The parameter step gives the distance between samples in m/z axis.
@@ -593,6 +594,34 @@ class Spectrum:
         new_intensity = A @ np.array([i for m,i in self.confs])  # matrix multiplication
         new_intensity /= (np.sqrt(2*np.pi)*sd)
         self.set_confs(list(zip(new_mass, new_intensity)))
+
+
+    def gaussian_smoothing(self, sd=0.01, new_mz=0.01):
+        """
+        Applies a gaussian filter to the mass spectrum in order to smooth
+        it out and decrease the electronic noise.
+        Technically, each intensity measurement is replaced by a Gaussian weighted average
+        of the neighbouring intensities.  
+        As a consequence, the resolution gets decreased.
+        Parameter sd (float) controls the width of the gaussian filter.
+        Parameter new_mz (float or np.array) is the mass axis of the resulting smoothed spectrum.
+        Setting it to float generates an equally spaced mass axis with new_mz being the step length.
+        Setting it to np.array sets it as the resulting mass axis.  
+        Note that after filtering, the area below curve (not the sum of intensities!)
+        is equal to the area of the original spectrum in profile mode,
+        or the sum of the input peak intensities in centroid mode.
+        """
+        if isinstance(new_mz, float):
+            new_mz = np.arange(self.confs[0][0] - 4*sd, self.confs[-1][0] + 4*sd, new_mz)
+        assert np.all(new_mz[1:] >= new_mz[:-1]), 'The new mz axis needs to be sorted!'
+        smooth_intensity = np.zeros(new_mz.shape)
+        for mz, intsy in self.confs:
+            # smooth_intensity += intsy*np.exp(-(mz - new_mz)**2)**(1/(2*sd**2))
+            lpid, rpid = np.searchsorted(new_mz, (mz - 4*sd, mz + 4*sd))
+            peak_mz = new_mz[lpid:rpid]
+            smooth_intensity[lpid:rpid] += intsy*np.exp(-(mz - peak_mz)**2)**(1/(2*sd**2))
+        smooth_intensity /= np.sqrt(2*np.pi)*sd
+        self.set_confs(list(zip(new_mz, smooth_intensity)))
 
 
     def cut_smallest_peaks(self, removed_proportion=0.001):
@@ -734,10 +763,20 @@ if __name__=="__main__":
     sd = 0.01
     C = deepcopy(S)
     C = C*(np.sqrt(2*np.pi)*sd)**-1
-    S.fuzzify_peaks(0.01, 0.0001)
+    S1 = deepcopy(S)
+    S.gaussian_smoothing(0.01,  0.001)
+    S1.fuzzify_peaks(0.01, 0.001)
     S.plot(profile=True, show=False)
+    S1.plot(profile=True, show=False)
     C.plot(show=False)
     plt.show()
+
+    T = Spectrum(confs=[(1, 1)])
+    T.gaussian_smoothing(0.01, np.array([0.96, 0.97, 0.98, 0.99, 1, 1.01, 1.02]))
+    T.plot(profile=True, show=False)
+    T = Spectrum(confs=[(1, 1)])
+    T.gaussian_smoothing(0.01, 0.001)
+    T.plot(profile=True)
 
     target_mz = np.linspace(45, 56, num=100)
     R = S.resample(target_mz)
