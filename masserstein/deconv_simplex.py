@@ -1,6 +1,7 @@
 import numpy as np
 from time import time
 from masserstein import Spectrum
+from masserstein import NMRSpectrum
 import pulp as lp
 from warnings import warn
 import tempfile
@@ -38,7 +39,6 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolverDefault):
         This function solves linear program describing optimal transport of signal between the experimental spectrum
         and the list of theoretical (reference) spectra. Additionally, an auxiliary point is introduced in order to
         remove noise from the experimental spectrum, as described by Ciach et al., 2020. 
-
         _____
         Parameters:
             exp_sp: Spectrum object
@@ -51,20 +51,14 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolverDefault):
                 Which solver should be used. In case of problems with the default solver,
                 pulp.GUROBI() is recommended (note that it requires obtaining a licence).
                 To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
-
         _____
         Returns: dict
             Dictionary with the following entries:
-
             - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
             spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
-
             - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
-
             - fun: Optimal value of the objective function.
-
             - status: Status of the linear program.
-
         """
         start = time()
         exp_confs = exp_sp.confs.copy()
@@ -92,7 +86,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolverDefault):
                 print("Interval lengths computed")
 
         # linear program:
-        program = lp.LpProblem('Dual_L1_regression_sparse', lp.LpMaximize)
+        program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
         if not quiet:
                 print("Linear program initialized")
         # variables:
@@ -159,7 +153,6 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolve
         This function solves linear program describing optimal transport of signal between the experimental spectrum
         and the list of theoretical (reference) spectra. Additionally, an auxiliary point is introduced in order to
         remove noise from the experimental spectrum, as described by Ciach et al., 2020. 
-
         _____
         Parameters:
             exp_sp: Spectrum object
@@ -172,20 +165,14 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolve
                 Which solver should be used. In case of problems with the default solver,
                 pulp.GUROBI() is recommended (note that it requires obtaining a licence).
                 To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
-
         _____
         Returns: dict
             Dictionary with the following entries:
-
             - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
             spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
-
             - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
-
             - fun: Optimal value of the objective function.
-
             - status: Status of the linear program.
-
         """
 
         start = time()
@@ -214,7 +201,7 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolve
                 print("Interval lengths computed")
 
         # linear program:
-        program = lp.LpProblem('Dual_L1_regression_sparse', lp.LpMaximize)
+        program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
         if not quiet:
                 print("Linear program initialized")
         # variables:
@@ -282,7 +269,6 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
         Transport of signal between the two auxiliary points is explicitly forbidden.
         Mathematically, this formulation is equivalent to the one implemented in dualdeconv4
         and both give the same results up to roundoff errors.
-
         _____
         Parameters:
             exp_sp: Spectrum object
@@ -297,29 +283,20 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 Which solver should be used. In case of problems with the default solver,
                 pulp.GUROBI() is recommended (note that it requires obtaining a licence).
                 To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
-
         _____
         Returns: dict
             Dictionary with the following entries:
-
             - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
             spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
-
             - noise_in_theoretical: Proportion of noise present in the combination of theoretical
             (reference) spectra.
-
             - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
-
             - theoretical trash: Amount of noise present in the combination of theoretical (reference)
             spectra in consecutive m/z points from global mass axis.
-
             - fun: Optimal value of the objective function.
-
             - status: Status of the linear program.
-
             - global mass axis: All the m/z values from the experimental spectrum and from the theoretical 
             (reference) spectra in a sorted list. 
-
         """
 
         start = time()
@@ -348,7 +325,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 print("Interval lengths computed")
 
         # linear program:
-        program = lp.LpProblem('Dual_L1_regression_sparse', lp.LpMaximize)
+        program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
         if not quiet:
                 print("Linear program initialized")
 
@@ -358,7 +335,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 for i in range(n-2):
                         lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
                 lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
-        except IndexError:
+        except IndexError: #linear program makes no sense if n<=2 (n-number of points in mixture's spectrum)
                 pass
         lpVars.append(lp.LpVariable('Z%i' % (n), None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
@@ -393,7 +370,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 for i in range(n-2):
                         program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
                         program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
-        except IndexError:
+        except IndexError: #linear program makes no sense if n<=2 (n-number of points in mixture's spectrum)
                 pass
 
         program += -lpVars[n-1] <= penalty, 'g_%i' % (n)
@@ -442,7 +419,6 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
         Transport of signal between the two auxiliary points is allowed (with cost equal to penalty + penalty_th),
         however, it is not optimal so it never occurs. Mathematically, this formulation is equivalent to the one 
         implemented in dualdeconv3 and both give the same results up to roundoff errors.
-
         _____
         Parameters:
             exp_sp: Spectrum object
@@ -461,25 +437,17 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
         _____
         Returns: dict
             Dictionary with the following entries:
-
             - probs: List containing proportions of consecutive theoretical (reference) spectra in the experimental
             spectrum. Note that they do not have to sum up to 1, because some part of the signal can be noise.
-
             - noise_in_theoretical: Proportion of noise present in the combination of theoretical
             (reference) spectra.
-
             - trash: Amount of noise in the consecutive m/z points of the experimental spectrum.
-
             - theoretical trash: Amount of noise present in the combination of theoretical (reference)
             spectra in consecutive m/z points from global mass axis.
-
             - fun: Optimal value of the objective function.
-
             - status: Status of the linear program.
-
             - global mass axis: All the m/z values from the experimental spectrum and from the theoretical 
             (reference) spectra in a sorted list. 
-
         """
 
         start = time()
@@ -508,7 +476,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 print("Interval lengths computed")
 
         # linear program:
-        program = lp.LpProblem('Dual_L1_regression_sparse', lp.LpMaximize)
+        program = lp.LpProblem('Dual L1 regression sparse', lp.LpMaximize)
         if not quiet:
                 print("Linear program initialized")
 
@@ -518,7 +486,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 for i in range(n-2):
                         lpVars.append(lp.LpVariable('Z%i' % (i+1), None, None, lp.LpContinuous))
                 lpVars.append(lp.LpVariable('Z%i' % (n-1), -interval_lengths[n-2], interval_lengths[n-2], lp.LpContinuous))
-        except IndexError:
+        except IndexError: #linear program makes no sense if n<=2 (n-number of points in mixture's spectrum)
                 pass
         lpVars.append(lp.LpVariable('Z%i' % n, None, None, lp.LpContinuous))
         lpVars.append(lp.LpVariable('Z%i' % (n+1), None, None, lp.LpContinuous))
@@ -552,7 +520,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 for i in range(n-2):
                         program += lpVars[i] - lpVars[i+1] <= interval_lengths[i], 'epsilon_plus_%i' % (i+1)
                         program += lpVars[i+1] - lpVars[i] <= interval_lengths[i], 'epsilon_minus_%i' % (i+1)
-        except IndexError:
+        except IndexError: #linear program makes no sense if n<=2 (n-number of points in mixture's spectrum)
                 pass
 
         program += -lpVars[n-1] <= 0, 'g_%i' % (n)
@@ -592,12 +560,12 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
 
 def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
                         MMD=-1, max_reruns=3, verbose=False, 
-                        progress=True, MTD_th=None, solver=LpSolverDefault):
+                        progress=True, MTD_th=None, solver=LpSolverDefault,
+                        what_to_compare='area'):
 
     """
     Returns estimated proportions of molecules from query in spectrum.
     Performs initial filtering of formulas and experimental spectrum to speed up the computations.
-
     _____
     Parameters:
     spectrum: Spectrum object
@@ -621,7 +589,7 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
         If this is detected, then those results are recomputed for a maximal number of times
         given by this parameter. Default is 3.
     verbose: bool
-        Print diagnistic messages? Default is False.
+        Print diagnostic messages? Default is False.
     progress: bool
         Whether to display progress bars during work. Default is True.
     MTD_th: Maximum Transport Distance for theoretical spectra, float
@@ -633,29 +601,24 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
         Which solver should be used. In case of problems with the default solver,
         pulp.GUROBI() is recommended (note that it requires obtaining a licence).
         To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
-
+    what_to_compare:
+        Should the resulting proportions correspond to concentrations or area under the curve? Default is
+        'concentration'. Alternatively can be set to 'area'. This argument is used only for NMR spectra.
     _____
     Returns: dict
         A dictionary with the following entries:
-
         - proportions: List of proportions of query (i.e. theoretical, reference) spectra.
-
         - noise: List of intensities that could not be explained by the supplied formulas. 
         The intensities correspond to the m/z values of the experimental spectrum.
-
         If MTD_th parameter is not equal to None, then the dictionary contains also 
         the following entries:
-
         - noise_in_theoretical: List of intensities from query (i.e. theoretical, reference) spectra
         that do not correspond to any intensities in the experimental spectrum and therefore were 
         identified as noise. The intensities correspond to the m/z values from global mass axis.
-
         - proportion_of_noise_in_theoretical: Proportion of noise present in the combination of query
         (i.e. theoretical, reference) spectra.
-
         - global_mass_axis: All the m/z values from the experimental spectrum and from the query 
         (i.e. theoretical, reference) spectra in a sorted list. 
-
     """
 
     def progr_bar(x, **kwargs):
@@ -668,11 +631,19 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
     except:
         print("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?")
         raise
-    assert abs(sum(x[1] for x in exp_confs) - 1.) < 1e-08, 'The experimental spectrum is not normalized.'
-    assert all(x[0] >= 0. for x in exp_confs), 'Found experimental peaks with negative masses!'
+    assert abs(sum(x[1] for x in exp_confs) - 1.) < 1e-08, "The mixture's spectrum is not normalized."
+    
+    assert what_to_compare=='concentration' or what_to_compare=='area', 'Comparison of %s is not supported' %what_to_compare
+    is_NMR_spectrum = [isinstance(sp, NMRSpectrum) for sp in [spectrum] + query]
+    assert all(is_NMR_spectrum) or not any(is_NMR_spectrum), 'Spectra provided are of mixed types. \
+            Please assert that either all or none of the spectra are NMR spectra.'
+    nmr = all(is_NMR_spectrum)
+
+    if not nmr:
+        assert all(x[0] >= 0. for x in exp_confs), 'Found peaks with negative masses!'
     if any(x[1] < 0 for x in exp_confs):
         raise ValueError("""
-        The experimental spectrum cannot contain negative intensities. 
+        The mixture's spectrum cannot contain negative intensities. 
         Please remove them using e.g. the Spectrum.trim_negative_intensities() method.
         """)
                            
@@ -686,9 +657,10 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
         MTD_max = max(MTD, MTD_th)
 
     for i, q in enumerate(query):
-        assert abs(sum(x[1] for x in q.confs) - 1.) < 1e-08, 'Theoretical spectrum %i is not normalized' %i
-        assert all(x[0] >= 0 for x in q.confs), 'Theoretical spectrum %i has negative masses!' % i
-
+        assert abs(sum(x[1] for x in q.confs) - 1.) < 1e-08, 'Reference spectrum %i is not normalized' %i
+        if not nmr:
+            assert all(x[0] >= 0 for x in q.confs), 'Reference spectrum %i has negative masses!' %i
+        
     # Initial filtering of formulas
     envelope_bounds = []
     filtered = []
@@ -760,14 +732,14 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
     exp_conf_chunks.append(matching_confs)
     chunk_TICs = [sum(exp_confs[i][1] for i in chunk_list) for chunk_list in exp_conf_chunks]
     if verbose:
-        # print('Trash after filtering:', vortex)
         print("Ion currents in chunks:", chunk_TICs)
 
     # Deconvolving chunks:
     p0_prime = 0
     vortex_th = []
     global_mass_axis = []
-    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks", 
+    objective_function = 0
+    for current_chunk_ID, conf_IDs in progr_bar(enumerate(exp_conf_chunks), desc="Deconvolving chunks",
                                                                             total=len(exp_conf_chunks)):
         if verbose:
             print("Deconvolving chunk %i" % current_chunk_ID)
@@ -821,6 +793,8 @@ def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
                 rescaled_vortex_th = [element*chunk_TICs[current_chunk_ID] for element in dec['theoretical_trash']]
                 vortex_th = vortex_th + rescaled_vortex_th
                 global_mass_axis = global_mass_axis + dec['global_mass_axis']
+                
+        objective_function = objective_function + dec['fun']
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
         warn("""In estimate_proportions:
@@ -828,107 +802,19 @@ Proportions of signal and noise sum to %f instead of 1.
 This may indicate improper results.
 Please check the deconvolution results and consider reporting this warning to the authors.
                         """ % (sum(proportions)+sum(vortex)))
-    if MTD_th is not None:
-        return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': vortex_th, 
-                'proportion_of_noise_in_theoretical': p0_prime, 'global_mass_axis': global_mass_axis}
+        
+    compare_area = ((not nmr) or (nmr and what_to_compare=='area'))
+
+    if compare_area:
+        if MTD_th is not None:
+            return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': vortex_th, 
+                'proportion_of_noise_in_theoretical': p0_prime, 'global_mass_axis': global_mass_axis, 
+                   'Wasserstein distance': objective_function}
+        else:
+            return {'proportions': proportions, 'noise': vortex,
+                    'Wasserstein distance': objective_function}
     else:
-        return {'proportions': proportions, 'noise': vortex}
-
-
-if __name__=="__main__":
-
-    exper = [(1., 1/6.), (2., 3/6.), (3., 2/6.)]
-    thr1 = [(1., 1/2.), (2.,1/2.)]
-    thr2 = [(2., 1/2.), (3., 1/2.)]
-
-    exper = [(1, 0.25), (3, 0.5), (6, 0.25)]
-    thr1 = [(1., 1.), (3, 0.)]
-    thr2 = [(3, 0.5), (4, 0.5)]
-    thr = [thr1, thr2]
-
-    exper = [(1.1, 1/3), (2.2, 5/12), (3.1, 1/4)]
-
-
-    exper = [(0, 1/4), (1.1, 1/6), (2.2, 5/24), (3.1, 1/8), (4, 1/4), (60, .1) ]
-    ##thr1 = [(1, 1/2), (2, 1/2)]
-    ##thr2 = [(2, 1/4), (3, 3/4)]
-    thr1 = [(0.1, 1./2), (1.0, 1./2)]
-    thr2 = [(3., 1/4), (4.2, 3/4.)]
-    thr3 = [(0.5, 1/4.), (1.2, 3./4)]
-    thr4 = [(20., 1.)]
-    thr = [thr1, thr2, thr3, thr4]
-
-    experSp = Spectrum('', empty=True)
-    experSp.set_confs(exper)
-    experSp.normalize()
-    thrSp = [Spectrum('', empty=True) for _ in range(len(thr))]
-    for i in range(len(thr)):
-        thrSp[i].set_confs(thr[i])
-        thrSp[i].normalize()
-    sol2 = dualdeconv2(experSp, thrSp, .2)
-    print('sum:', sum(sol2['probs']+sol2['trash']))
-    test = estimate_proportions(experSp, thrSp, MTD=.2, MMD=0.21)
-
-    # Very similar masses can introduce errors due to catastrophical cancellations
-    chunk_confs = [[1. + 1e-06, 0.6], [1.4, 0.4]]
-    query_confs = [(1.00000, 0.6), (1.5, 0.4)]
-    badSp = Spectrum('', empty=True)
-    badSp.set_confs(chunk_confs)
-    badSp.normalize()
-
-    qSp = Spectrum('', empty=True)
-    qSp.set_confs(query_confs)
-    qSp.normalize()
-    dualdeconv2(badSp, [qSp], 0.003, quiet=False)
-
-    # Solution: use mpf library
-    from mpmath import mpf, mp
-    mp.dps = 25
-    chunk_confs = [[mpf(1.) + mpf(1e-06), 0.6], [1.4, 0.4]]
-    query_confs = [(1.00000, 0.6), (1.5, 0.4)]
-    badSp = Spectrum('', empty=True)
-    badSp.set_confs(chunk_confs)
-    badSp.normalize()
-
-    qSp = Spectrum('', empty=True)
-    qSp.set_confs(query_confs)
-    qSp.normalize()
-    dualdeconv2(badSp, [qSp], 0.003, quiet=False)
-
-    # Other tests:
-##    experSp2 = Spectrum('', empty=True)
-##    fr = exper[:-1].copy()
-##    experSp2.set_confs(fr)
-##    experSp2.normalize()
-##    sol22 = dualdeconv2(experSp2, thrSp[:2], .2)
-##    print('sum:', sum(sol22['probs']+sol22['trash']))
-##
-##    global_mass_axis = set(x[0] for x in experSp2.confs)
-##    global_mass_axis.update(x[0] for s in thrSp for x in s.confs)
-##    global_mass_axis = sorted(global_mass_axis)
-##
-##    thr_conf_iters = [list(intensity_generator(t.confs, global_mass_axis)) for t in thrSp]
-##    thr_conf_iters = [[(m, i) for m, i in zip(global_mass_axis, cnflist) if i>0] for cnflist in thr_conf_iters]
-##
-##    exper2 = [(0, 1/4), (1.1, 1/6), (2.2, 5/24), (3.1, 1/8), (4, 1/4)]
-##    sp2 = Spectrum('', empty=True)
-##    sp2.set_confs(exper2)
-##    sp2.normalize()
-##    noise = Spectrum('', empty=True)
-##    noise.set_confs([exper2[2]])
-##    noise.normalize()
-##    sp2.WSDistance(thrSp[0]*0.35 + thrSp[1]*0.5 + noise*0.125)
-##    dualdeconv2(sp2, thrSp[:2], 1.)
-##
-##    thr1 = [(1., 1.)]
-##    thr2 = [(2., 1.)]
-##    exper = [(1., 0.4), (1.5, 0.2), (2, 0.4)]
-##    thr = [thr1, thr2]
-##    experSp = Spectrum('', empty=True)
-##    experSp.set_confs(exper)
-##    experSp.normalize()
-##    thrSp = [Spectrum('', empty=True) for _ in range(len(thr))]
-##    for i in range(len(thr)):
-##        thrSp[i].set_confs(thr[i])
-##        thrSp[i].normalize()
-##    sol2 = dualdeconv2(experSp, thrSp, .5)
+        queries_protons = [query_spec.protons for query_spec in query]
+        rescaled_proportions = [prop/prot for prop, prot in zip(proportions, queries_protons)]
+        rescaled_proportions = [prop/sum(rescaled_proportions) for prop in rescaled_proportions]
+        return {'proportions': rescaled_proportions, 'Wasserstein distance': objective_function}
