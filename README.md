@@ -1,10 +1,10 @@
-# Contents of this repository
-This repository contains software tools which allow to compare spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
+# Magnetstein
 
-The tools are distributed as a Python3 package called `masserstein`. The package contains functions for generating spectra from chemical formulas, basic processing (centroiding, smoothing), and fitting combinations of reference spectra of analytes to a spectrum of their mixture.  
-Example uses of the package are shown in the tutorials available on this repository.  
+This repository contains software tools which allow to compare nuclear magnetic resonance (NMR) spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
 
-If you encounter any difficulties during installation or usage of these programs, or if you have any suggestions regarding their functionality, please post a GitHub issue or send an email to m.ciach@mimuw.edu.pl. 
+Magnetstein is a modification of the algorithm from a Python3 package called `masserstein` (available in this repository on branch master). 
+
+If you encounter any difficulties during installation or usage of these programs, or if you have any suggestions regarding their functionality, please post a GitHub issue or send an email to b.domzal@mimuw.edu.pl. 
 
 # Installation
 
@@ -29,6 +29,12 @@ python3 setup.py install --user
 ```
 
 This will install the `masserstein` package for the current user.  
+To switch from masserstein (mass spectrometry tool) to magnetstein (NMR spectroscopy tool) run:
+
+```
+git checkout magnetstein
+```
+
 You will also need to have the following packages installed (all availiable via pip):
 
 * `IsoSpecPy`
@@ -36,6 +42,11 @@ You will also need to have the following packages installed (all availiable via 
 * `scipy`
 * `PuLP`
 
+If you are a researcher, we also recommend using Gurobi (available for academics at no cost) as your solver in magnetstein. For more information on license and installation see [Gurobi website.](https://www.gurobi.com/)
+
+# Acknowledgements
+
+Powered by [©Gurobi.](https://www.gurobi.com/)
 
 # Citing 
 
