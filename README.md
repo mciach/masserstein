@@ -1,6 +1,6 @@
 # Magnetstein
 
-This repository contains software tools which allow to compare nuclear magnetic resonance (NMR) spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
+This repository contains software tools which allow to compare nuclear magnetic resonance (NMR) spectra and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
 
 Magnetstein is a modification of the algorithm from a Python3 package called `masserstein` (available in this repository on branch master). 
 
@@ -42,11 +42,11 @@ You will also need to have the following packages installed (all availiable via 
 * `scipy`
 * `PuLP`
 
-If you are a researcher, we also recommend using Gurobi (available for academics at no cost) as your solver in magnetstein. For more information on license and installation see [Gurobi website.](https://www.gurobi.com/)
+If you are a researcher, we also recommend using Gurobi (available for academics at no cost) as your solver in magnetstein. For more information on license and installation, see [Gurobi website.](https://www.gurobi.com/)
 
 # Acknowledgements
 
-Powered by [©Gurobi.](https://www.gurobi.com/)
+Powered by [© Gurobi.](https://www.gurobi.com/)
 
 # Citing 
 
