@@ -1,5 +1,6 @@
-# Contents of this repository
-This repository contains software tools which allow to compare spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
+# Polistein
+
+This repository contains software tools which allow to compare MALDI-ToF polymer spectra using the Wasserstein distance and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
 
 The tools are distributed as a Python3 package called `masserstein`. The package contains functions for generating spectra from chemical formulas, basic processing (centroiding, smoothing), and fitting combinations of reference spectra of analytes to a spectrum of their mixture.  
 Example uses of the package are shown in the tutorials available on this repository.  
@@ -28,13 +29,31 @@ The above command will create a folder `wassersteinms` in your current working d
 python3 setup.py install --user
 ```
 
-This will install the `masserstein` package for the current user.  
+This will install the masserstein package for the current user.
+To switch from masserstein (mass spectrometry tool) to polistein (MALDI-ToF spectrometry tool for polymer spectra) run:
+
+```
+git checkout polistein
+```
+
 You will also need to have the following packages installed (all availiable via pip):
 
 * `IsoSpecPy`
 * `numpy`
 * `scipy`
 * `PuLP`
+
+If you are a researcher, we also recommend using Gurobi (available for academics at no cost) as your solver in magnetstein. For more information on license and installation, see [Gurobi website.](https://www.gurobi.com/)
+
+# Acknowledgements
+
+Powered by [© Gurobi.](https://www.gurobi.com/)
+
+# Citing 
+
+If you use tools from this package, please cite the following article:  
+
+Ciach, M. A., Miasojedow, B., Skoraczynski, G., Majewski, S., Startek, M., Valkenborg, D., & Gambin, A. (2020). Masserstein: linear regression of mass spectra by optimal transport. Rapid Communications in Mass Spectrometry.
 
 
 # Citing 
