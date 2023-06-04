@@ -278,7 +278,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
         This function solves linear program describing optimal transport of signal between 
         the experimental spectrum and the list of theoretical (reference) spectra. 
         Two auxiliary points are introduced in order to remove noise from the experimental spectrum
-        and from the combination of theoretical (reference) spectra, as described by Domżał et al., 2022. 
+        and from the combination of theoretical (reference) spectra. 
         Transport of signal between the two auxiliary points is explicitly forbidden.
         Mathematically, this formulation is equivalent to the one implemented in dualdeconv4
         and both give the same results up to roundoff errors.
@@ -438,7 +438,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
         This function solves linear program describing optimal transport of signal between the experimental 
         spectrum and the list of theoretical (reference) spectra. 
         Two auxiliary points are introduced in order to remove noise from the experimental spectrum
-        and from the combination of theoretical (reference) spectra, as described by Domżał et al., 2022. 
+        and from the combination of theoretical (reference) spectra. 
         Transport of signal between the two auxiliary points is allowed (with cost equal to penalty + penalty_th),
         however, it is not optimal so it never occurs. Mathematically, this formulation is equivalent to the one 
         implemented in dualdeconv3 and both give the same results up to roundoff errors.
@@ -592,7 +592,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
 
 def estimate_proportions(spectrum, query, MTD=0.1, MDC=1e-8,
                         MMD=-1, max_reruns=3, verbose=False, 
-                        progress=True, MTD_th=None, solver=LpSolverDefault):
+                        progress=True, MTD_th=0.1, solver=LpSolverDefault):
 
     """
     Returns estimated proportions of molecules from query in spectrum.
