@@ -7,7 +7,7 @@ import tempfile
 from tqdm import tqdm
 from pulp.apis import LpSolverDefault
 from masserstein import misc
-
+import polymers
 
 
 def intensity_generator(confs, mzaxis):
@@ -601,7 +601,7 @@ def estimate_proportions_old(spectrum, query, MTD=0.1, MDC=1e-8,
             filtered.append(i)
     ############################################################################################
     # check if any valid envelopes left
-    assert len(filtered)==k, "No valid (matching) theoretical spectra left after initial filtering!"
+    assert len(filtered)!=k, "No valid (matching) theoretical spectra left after initial filtering!"
     ############################################################################################
     # sort envelopes
     envelope_bounds.sort(key=lambda x: x[0])  # sorting by lower bounds
@@ -619,14 +619,14 @@ def estimate_proportions_old(spectrum, query, MTD=0.1, MDC=1e-8,
     current_chunk, first_present = 0, 0
     # 1. removed spectra all have -1 in chunksIDs -> go into the same chunk
     while envelope_bounds[first_present][0] == -1 and first_present < k-1: 
-        _, _, query_id, _ = envelope_bounds[first_present]
+        _, _, query_id = envelope_bounds[first_present]
         chunkIDs[query_id] = -1
         first_present += 1
     ############################################################################################
     # 2. sort all not removed theorethical spectra into chunks
-    prev_mn, prev_mx, _, _ = envelope_bounds[first_present] # save last chunk bounds
+    prev_mn, prev_mx, _ = envelope_bounds[first_present] # save last chunk bounds
     for i in progr_bar(range(first_present, k), desc = "Computing chunks"):
-        mn, mx, query_id, cost = envelope_bounds[i]
+        mn, mx, query_id = envelope_bounds[i]
         if mn - prev_mx > 2*MTD_max:
             current_chunk += 1
             chunk_bounds.append( (prev_mn-MTD_max, prev_mx+MTD_max) )
@@ -857,7 +857,7 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
             removed.append(i)
     ############################################################################################
     # check if any valid envelopes left
-    assert len(removed)==k, "No valid (matching) theoretical spectra left after initial filtering!"
+    assert len(removed)!=k, "No valid (matching) theoretical spectra left after initial filtering!"
     ############################################################################################
     # sort envelopes
     envelope_bounds.sort(key=lambda x: x[0])  # sorting by lower bounds
