@@ -601,7 +601,7 @@ def estimate_proportions_old(spectrum, query, MTD=0.1, MDC=1e-8,
             filtered.append(i)
     ############################################################################################
     # check if any valid envelopes left
-    assert len(filtered)!=k, "No valid theoretical spectra left after initial filtering!"
+    assert len(filtered)==k, "No valid (matching) theoretical spectra left after initial filtering!"
     ############################################################################################
     # sort envelopes
     envelope_bounds.sort(key=lambda x: x[0])  # sorting by lower bounds
@@ -857,7 +857,7 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
             removed.append(i)
     ############################################################################################
     # check if any valid envelopes left
-    assert len(removed)!=k, "No valid (matching) theoretical spectra left after initial filtering!"
+    assert len(removed)==k, "No valid (matching) theoretical spectra left after initial filtering!"
     ############################################################################################
     # sort envelopes
     envelope_bounds.sort(key=lambda x: x[0])  # sorting by lower bounds
