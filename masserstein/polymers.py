@@ -12,7 +12,7 @@ from masserstein.model_selection import get_composition
 import matplotlib.pyplot as plt
 import functools
 from itertools import cycle, combinations_with_replacement, combinations
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
 def load_mzxml(path, huge_tree=False):
@@ -98,8 +98,8 @@ def _gaussian_smoothing(self, sd=0.01, new_mz=0.01):
   self.gaussian_smoothing(sd, new_mz)
   return self
 
-# Spectrum._normalize = _normalize
-# Spectrum._gaussian_smoothing = _gaussian_smoothing
+Spectrum._normalize = _normalize
+Spectrum._gaussian_smoothing = _gaussian_smoothing
 
 def plot(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=True):
   colors = cycle(['royalblue']+list('grcmyk'))
@@ -184,11 +184,11 @@ def formula_from_dict(d):
 #     K = Counter(K=1),
 # )
 
-def get_possible_compounds(heavier_monomer:Dict, lighter_monomer:Dict, end_groups:Dict, min_mz, max_mz, max_count_diff, adducts=None , verbose=False):
+def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_groups:Dict, min_mz, max_mz, max_count_diff, adducts=None, verbose=False):
 
   possible_compounds=[]
-  A, a, = heavier_monomer.items(), 
-  B, b = lighter_monomer.items()
+  A, a, = heavier_monomer 
+  B, b = lighter_monomer
 
   def add_lighter_end_adduct(a_count, start):
     #core polymer
