@@ -52,6 +52,10 @@ in the commandline.)
 
 If you are a researcher, we strongly recommend using Gurobi (available for academics at no cost) as your solver in magnetstein. For more information on license and installation, see [Gurobi website.](https://www.gurobi.com/). To use magnetstein with Gurobi, set solver=pulp.GUROBI() in estimate_proportions function.
 
+# Examples
+
+See estimation.ipynb in folder examples/.
+
 # Acknowledgements
 
 Powered by [© Gurobi.](https://www.gurobi.com/)
