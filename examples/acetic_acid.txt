@@ -1,6 +1,0 @@
-# Mass spectrum of acetic acid, C2H4O2, predicted by IsoSpec
-# m/z       	relative intensity
-60.0211293695	0.978654163823
-61.0244842047	0.0213458361771
-
-

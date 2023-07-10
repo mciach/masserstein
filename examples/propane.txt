@@ -1,4 +1,0 @@
-# Mass spectrum of propane, C3H8, predicted by IsoSpec
-# m/z       	relative intensity
-44.0626002582	0.968319370498
-45.0659550934	0.031680629502
