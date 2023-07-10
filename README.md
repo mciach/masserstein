@@ -1,6 +1,6 @@
 # Magnetstein
 
-This repository contains software tools which allow to compare nuclear magnetic resonance (NMR) spectra and estimate relative abundances of molecules from the spectrum by minimizing the Wasserstein distance. 
+This repository contains software tools which allow to compare nuclear magnetic resonance (NMR) spectra and estimate proportions of components in mixture using the Wasserstein distance. 
 
 Magnetstein is a modification of the algorithm from a Python3 package called `masserstein` (available in this repository on branch master). 
 
@@ -9,20 +9,20 @@ If you encounter any difficulties during installation or usage of these programs
 # Installation
 
 To be able to use the software provided in this repository, you will need to have a working Python3 distribution installed on your computer.  
-The simplest way to install `masserstein` is to use the `pip` tool in the command-line: 
 
-```
-pip install masserstein
-```
-
-This will install the latest stable release of the package.  
-To get the development version, clone this repository. In the commandline, this can be done by typing:
+To use magnetstein, clone this repository. In the commandline, this can be done by typing:
 
 ```
 git clone https://github.com/mciach/wassersteinms.git
 ```
 
-The above command will create a folder `wassersteinms` in your current working directory. The folder contains the setup file and some example data. Finally, install the package by running the `setup.py` file:
+The above command will create a folder `wassersteinms` in your current working directory. Go to this directory by typing
+
+```
+cd wassersteinms/
+```
+
+in the commandline. Then, install the package by running the `setup.py` file:
 
 ```
 python3 setup.py install --user
@@ -42,7 +42,15 @@ You will also need to have the following packages installed (all availiable via 
 * `scipy`
 * `PuLP`
 
-If you are a researcher, we also recommend using Gurobi (available for academics at no cost) as your solver in magnetstein. For more information on license and installation, see [Gurobi website.](https://www.gurobi.com/)
+(For example: if you would like to install pulp, you need to type
+
+```
+pip install PuLP
+```
+
+in the commandline.)
+
+If you are a researcher, we strongly recommend using Gurobi (available for academics at no cost) as your solver in magnetstein. For more information on license and installation, see [Gurobi website.](https://www.gurobi.com/). To use magnetstein with Gurobi set solver argument to pulp.GUROBI() in estimate_proportions function.
 
 # Acknowledgements
 
@@ -50,8 +58,5 @@ Powered by [© Gurobi.](https://www.gurobi.com/)
 
 # Citing 
 
-If you use tools from this package, please cite the following article:  
-
-Ciach, M. A., Miasojedow, B., Skoraczynski, G., Majewski, S., Startek, M., Valkenborg, D., & Gambin, A. (2020). Masserstein: linear regression of mass spectra by optimal transport. Rapid Communications in Mass Spectrometry.
-
+Article about magnetstein is in preparation. If you use tools from this package, please include link to this repository in citation.
 
