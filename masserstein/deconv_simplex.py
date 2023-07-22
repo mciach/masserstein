@@ -560,13 +560,8 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
 
 def estimate_proportions(spectrum, query, MTD=0.25, MDC=1e-8,
                         MMD=-1, max_reruns=3, verbose=False, 
-<<<<<<< HEAD
                         progress=True, MTD_th=0.1, solver=LpSolverDefault,
                         what_to_compare='concentration'):
-=======
-                        progress=True, MTD_th=0.1, solver=LpSolverDefault):
->>>>>>> master
-
     """
     Returns estimated proportions of molecules from query in spectrum.
     Performs initial filtering of formulas and experimental spectrum to speed up the computations.
