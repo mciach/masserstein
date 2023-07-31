@@ -1,3 +1,5 @@
+Magnetstein has been moved to another repository and therefore version available here may not be the latest one. For the latest version of Magnetstein, go to the [new repository](https://github.com/BDomzal/magnetstein).
+
 # Magnetstein
 
 This repository contains software tools which allow to compare nuclear magnetic resonance (NMR) spectra and estimate proportions of components in mixture using the Wasserstein distance. 
