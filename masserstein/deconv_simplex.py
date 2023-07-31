@@ -49,7 +49,7 @@ def dualdeconv2(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolverDefault):
                 Denoising penalty.
             solver: 
                 Which solver should be used. In case of problems with the default solver,
-                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                lp.GUROBI() (i.e. pulp.GUROBI()) is recommended (note that it requires obtaining a licence).
                 To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
         _____
         Returns: dict
@@ -163,7 +163,7 @@ def dualdeconv2_alternative(exp_sp, thr_sps, penalty, quiet=True, solver=LpSolve
                 Denoising penalty.
             solver: 
                 Which solver should be used. In case of problems with the default solver,
-                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                lp.GUROBI() (i.e. pulp.GUROBI()) is recommended (note that it requires obtaining a licence).
                 To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
         _____
         Returns: dict
@@ -281,7 +281,7 @@ def dualdeconv3(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 Denoising penalty for the theoretical (reference) spectra.
             solver: 
                 Which solver should be used. In case of problems with the default solver,
-                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                lp.GUROBI() (i.e. pulp.GUROBI()) is recommended (note that it requires obtaining a licence).
                 To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
         _____
         Returns: dict
@@ -431,7 +431,7 @@ def dualdeconv4(exp_sp, thr_sps, penalty, penalty_th, quiet=True, solver=LpSolve
                 Denoising penalty for the theoretical (reference) spectra.
             solver: 
                 Which solver should be used. In case of problems with the default solver,
-                pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+                lp.GUROBI() (i.e. pulp.GUROBI()) is recommended (note that it requires obtaining a licence).
                 To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
         
         _____
@@ -598,7 +598,7 @@ def estimate_proportions(spectrum, query, MTD=0.25, MDC=1e-8,
         when estimating molecule proportions. Default is None.
     solver: 
         Which solver should be used. In case of problems with the default solver,
-        pulp.GUROBI() is recommended (note that it requires obtaining a licence).
+        lp.GUROBI() (i.e. pulp.GUROBI()) is recommended (note that it requires obtaining a licence).
         To see all solvers available at your machine execute: pulp.listSolvers(onlyAvailable=True).
     what_to_compare:
         Should the resulting proportions correspond to concentrations or area under the curve? Default is
