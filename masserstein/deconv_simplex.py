@@ -419,18 +419,15 @@ def dualdeconv4_with_costs(experimental_sp, theoretical_sps, costs, penalty, pen
                             lp.lpSum(v*x for v, x in zip([-1, 0, 0, -1], lpVars[n-1:]))), 'Dual_objective' #lpVars[n-1:] = {z_n, z_{n+1}, z_{n+2}, z_{n+3}}
 
         # CONSTRAINTS
-        # W^T * z <= -kappa 
+        # W^T * z - C <= -kappa 
         ###################################################################################################################        
         for j in range(k): # for each of k theorethical spectra
                 theoretical_vec = intensity_generator(theoretical_confs[j], global_mass_axis) # generator of theoretical intensity observations
                 WTz = lp.LpAffineExpression()
-                for i, (v, x) in enumerate(zip(theoretical_vec, lpVars[:n-1]+[0])):
-                      if i==0: 
-                            WTz.addInPlace((v+costs[j])*x) #incorporate cost to nu(s1)
-                      else: 
-                            if v > 0.: WTz.addInPlace(v*x)   
+                for v, x in zip(theoretical_vec, lpVars[:n-1]+[0]):
+                    if v > 0.: WTz.addInPlace(v*x)   
                 WTz.addInPlace(lp.lpSum(v*x for v, x in zip([-1, 0, 1, -1], lpVars[n-1:])))                   
-                program += WTz <= -penalty, 'p_%i' % (j+1) #add W_j^T * z <= -kappa constaints
+                program += WTz <= costs[j] - penalty, 'p_%i' % (j+1) #add W_j^T * z - C <= -kappa constaints
         ###################################################################################################################
 
         # (V'^T) * z <= kappa'
@@ -999,98 +996,114 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
 
 if __name__=="__main__":
 
-    exper = [(1., 1/6.), (2., 3/6.), (3., 2/6.)]
-    thr1 = [(1., 1/2.), (2.,1/2.)]
-    thr2 = [(2., 1/2.), (3., 1/2.)]
+    # for tests
+    import plotly.graph_objects as go
+    import matplotlib.pyplot as plt
+    import os
+    from glob import glob
+    from copy import deepcopy
 
-    exper = [(1, 0.25), (3, 0.5), (6, 0.25)]
-    thr1 = [(1., 1.), (3, 0.)]
-    thr2 = [(3, 0.5), (4, 0.5)]
-    thr = [thr1, thr2]
+    def _normalize(self):
+        self = deepcopy(self)
+        self.normalize()
+        return self
 
-    exper = [(1.1, 1/3), (2.2, 5/12), (3.1, 1/4)]
+    def _gaussian_smoothing(self, sd=0.01, new_mz=0.01):
+        self = deepcopy(self)
+        self.gaussian_smoothing(sd, new_mz)
+        return self
 
+    Spectrum._normalize = _normalize
+    Spectrum._gaussian_smoothing = _gaussian_smoothing
 
-    exper = [(0, 1/4), (1.1, 1/6), (2.2, 5/24), (3.1, 1/8), (4, 1/4), (60, .1) ]
-    ##thr1 = [(1, 1/2), (2, 1/2)]
-    ##thr2 = [(2, 1/4), (3, 3/4)]
-    thr1 = [(0.1, 1./2), (1.0, 1./2)]
-    thr2 = [(3., 1/4), (4.2, 3/4.)]
-    thr3 = [(0.5, 1/4.), (1.2, 3./4)]
-    thr4 = [(20., 1.)]
-    thr = [thr1, thr2, thr3, thr4]
+    #  WITH COSTS TESTS
+    pbttt_min_mz=3473
+    pbttt_max_mz=3512
 
-    experSp = Spectrum('', empty=True)
-    experSp.set_confs(exper)
-    experSp.normalize()
-    thrSp = [Spectrum('', empty=True) for _ in range(len(thr))]
-    for i in range(len(thr)):
-        thrSp[i].set_confs(thr[i])
-        thrSp[i].normalize()
-    sol2 = dualdeconv2(experSp, thrSp, .2)
-    print('sum:', sum(sol2['probs']+sol2['trash']))
-    test = estimate_proportions(experSp, thrSp, MTD=.2, MMD=0.21)
+    spectra = []
+    names = []
 
-    # Very similar masses can introduce errors due to catastrophical cancellations
-    chunk_confs = [[1. + 1e-06, 0.6], [1.4, 0.4]]
-    query_confs = [(1.00000, 0.6), (1.5, 0.4)]
-    badSp = Spectrum('', empty=True)
-    badSp.set_confs(chunk_confs)
-    badSp.normalize()
+    # fig = go.Figure() 
 
-    qSp = Spectrum('', empty=True)
-    qSp.set_confs(query_confs)
-    qSp.normalize()
-    dualdeconv2(badSp, [qSp], 0.003, quiet=False)
+    paths=["./polymer_examples/JV303-CB.mzXML"]
 
-    # Solution: use mpf library
-    from mpmath import mpf, mp
-    mp.dps = 25
-    chunk_confs = [[mpf(1.) + mpf(1e-06), 0.6], [1.4, 0.4]]
-    query_confs = [(1.00000, 0.6), (1.5, 0.4)]
-    badSp = Spectrum('', empty=True)
-    badSp.set_confs(chunk_confs)
-    badSp.normalize()
+    for path in paths:
+        s = polymers.load_mzxml(path, huge_tree=True)
+        print(s.confs[0], s.confs[-1])
+        label = os.path.split(path)[-1]
+        label = label[:-6]
+        s = polymers.restrict(s, pbttt_min_mz-1, pbttt_max_mz+1)
+        if label == "C14_unknown":
+            s = polymers.correct_baseline(s, 15000)
+        elif label == "C14_unknown_7p": 
+            s = polymers.correct_baseline(s, 1500)
+        else:
+            s = polymers.correct_baseline(s, 1000)
+        s = s._gaussian_smoothing(sd=0.1)
 
-    qSp = Spectrum('', empty=True)
-    qSp.set_confs(query_confs)
-    qSp.normalize()
-    dualdeconv2(badSp, [qSp], 0.003, quiet=False)
+        # mz, i = np.array(s.confs).T
+        # fig.add_trace(
+        #     go.Scattergl(x=mz, y=i, name=label)
+        # )
 
-    # Other tests:
-##    experSp2 = Spectrum('', empty=True)
-##    fr = exper[:-1].copy()
-##    experSp2.set_confs(fr)
-##    experSp2.normalize()
-##    sol22 = dualdeconv2(experSp2, thrSp[:2], .2)
-##    print('sum:', sum(sol22['probs']+sol22['trash']))
-##
-##    global_mass_axis = set(x[0] for x in experSp2.confs)
-##    global_mass_axis.update(x[0] for s in thrSp for x in s.confs)
-##    global_mass_axis = sorted(global_mass_axis)
-##
-##    thr_conf_iters = [list(intensity_generator(t.confs, global_mass_axis)) for t in thrSp]
-##    thr_conf_iters = [[(m, i) for m, i in zip(global_mass_axis, cnflist) if i>0] for cnflist in thr_conf_iters]
-##
-##    exper2 = [(0, 1/4), (1.1, 1/6), (2.2, 5/24), (3.1, 1/8), (4, 1/4)]
-##    sp2 = Spectrum('', empty=True)
-##    sp2.set_confs(exper2)
-##    sp2.normalize()
-##    noise = Spectrum('', empty=True)
-##    noise.set_confs([exper2[2]])
-##    noise.normalize()
-##    sp2.WSDistance(thrSp[0]*0.35 + thrSp[1]*0.5 + noise*0.125)
-##    dualdeconv2(sp2, thrSp[:2], 1.)
-##
-##    thr1 = [(1., 1.)]
-##    thr2 = [(2., 1.)]
-##    exper = [(1., 0.4), (1.5, 0.2), (2, 0.4)]
-##    thr = [thr1, thr2]
-##    experSp = Spectrum('', empty=True)
-##    experSp.set_confs(exper)
-##    experSp.normalize()
-##    thrSp = [Spectrum('', empty=True) for _ in range(len(thr))]
-##    for i in range(len(thr)):
-##        thrSp[i].set_confs(thr[i])
-##        thrSp[i].normalize()
-##    sol2 = dualdeconv2(experSp, thrSp, .5)
+        s = polymers.centroided(s, max_width=0.75, peak_height_fraction=0.5)
+        s.label = label
+
+        spectra.append(s)
+        names.append(s.label)
+
+    # fig
+
+    ########################################################################################################
+    bt = polymers.Counter(C=36, H=60, S=2)
+    bt_16 = polymers.Counter(C=40, H=68, S=2)
+    tt = polymers.Counter(C=6, H=2, S=2)
+    dtt = polymers.Counter(C=8, H=2, S=3)
+    end_groups = dict(
+      Stannyl = polymers.Counter(C=3, H=9, Sn=1),
+      Br = polymers.Counter(Br=1),
+      H = polymers.Counter(H=1),
+      Methyl = polymers.Counter(C=1, H=3),
+      Phenyl = polymers.Counter(C=6, H=5),
+      # Orthothyl = Counter(C=7, H=7),
+    )
+    ########################################################################################################
+
+    expected_spectra = polymers.get_possible_compounds(("BT",bt), ("TT", tt), end_groups, pbttt_min_mz, pbttt_max_mz, 5, verbose=True)
+    x = 0.19
+    # 0.04 interesting
+    costs = [x/2, 0, x/2, 0, x/2, 0, x/2, x/2, 0, 0, x/2, 0]
+    costs = [x, 0, 0, 0, 0]
+
+    spectrum = spectra[0]._normalize()
+
+    result_og = estimate_proportions(spectrum, expected_spectra, MTD = 0.6, MTD_th = 0.7, MDC = 1e-3)
+    plt.figure(figsize=(10, 6))
+    polymers.plot(spectrum, expected_spectra, result_og['proportions'])
+    plt.tight_layout()
+    plt.savefig(f"./figures/result_og_{x}.png")
+    # plt.show()
+    plt.close()
+
+    plt.figure(figsize=(10, 6))
+    polymers.plot_sum_regressed(spectrum, expected_spectra, result_og['proportions'])
+    plt.tight_layout()
+    plt.savefig(f"./figures/result_og_reg_{x}.png")
+    # plt.show()
+    plt.close()
+
+    result_costs =  estimate_proportions(spectrum, expected_spectra, costs = costs, MTD = 0.6, MTD_th = 0.7, MDC = 1e-3)
+    plt.figure(figsize=(10, 6))
+    plt.tight_layout()
+    polymers.plot(spectrum, expected_spectra, result_costs['proportions'])
+    plt.tight_layout()
+    plt.savefig(f"./figures/result_cost_{x}.png")
+    # plt.show()
+    plt.close()
+
+    plt.figure(figsize=(10, 6))
+    polymers.plot_sum_regressed(spectrum, expected_spectra, result_costs['proportions'])
+    plt.tight_layout()
+    plt.savefig(f"./figures/result_cost_reg_{x}.png")
+    # plt.show()
+    plt.close()
