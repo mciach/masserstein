@@ -167,7 +167,7 @@ class Spectrum:
         """
         Merges configurations with an identical mass, summing their intensities.
         """
-        if not self.empty:
+        if self.confs: 
             cmass = self.confs[0][0]
             cprob = 0.0
             ret = []
@@ -186,7 +186,7 @@ class Spectrum:
     def set_confs(self, confs):
         self.confs = confs
         if len(self.confs) > 0:
-            self.empty = False #if not set then merge does not work
+            self.empty = False
             self.sort_confs()
             self.merge_confs()
         else:
@@ -205,6 +205,7 @@ class Spectrum:
         res = Spectrum()
         res.set_confs([(x[0], number*x[1]) for x in self.confs])
         res.label = self.label
+        res.empty = self.empty
         return res
 
     def __rmul__(self, number):
