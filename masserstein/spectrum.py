@@ -188,6 +188,7 @@ class Spectrum:
         if len(self.confs) > 0:
             self.sort_confs()
             self.merge_confs()
+            self.empty = False
         else:
             self.empty = True
 
@@ -657,7 +658,7 @@ class Spectrum:
         merged_bounds = []
         c_low, c_up = bounds[0]
         for b in bounds:
-            if b[0] <= c:
+            if b[0] <= c_low:
                 pass # to be finished
 
 
