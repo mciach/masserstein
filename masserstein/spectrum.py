@@ -279,8 +279,8 @@ class Spectrum:
         will correspond to nominal mass of peaks.
         """
         xcoord, ycoord = zip(*self.confs)
-        xcoord = map(lambda x: x*self.charge, xcoord)
-        xcoord = (xcoord[0] + round(x-xcoord[0], nb_of_digits) for x in xcoord)
+        xcoord = list(map(lambda x: x*self.charge, xcoord))
+        xcoord = [xcoord[0] + round(x-xcoord[0], nb_of_digits) for x in xcoord]
         xcoord = map(lambda x: x/self.charge, xcoord)
         self.confs = list(zip(xcoord, ycoord))
         self.sort_confs()
