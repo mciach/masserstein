@@ -2,13 +2,13 @@ import os
 from glob import glob
 from pprint import pprint
 from pyteomics import mzxml
-from masserstein import Spectrum
+from spectrum import Spectrum
 import pandas as pd
 from copy import deepcopy
 import numpy as np
 from tqdm import tqdm 
 from collections import Counter, OrderedDict
-from masserstein.model_selection import get_composition
+from model_selection import get_composition
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.lines import Line2D
