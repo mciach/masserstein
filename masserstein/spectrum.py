@@ -186,15 +186,16 @@ class Spectrum:
     def set_confs(self, confs):
         self.confs = confs
         if len(self.confs) > 0:
+            self.empty = False #if not set then merge does not work
             self.sort_confs()
             self.merge_confs()
-            self.empty = False
         else:
             self.empty = True
 
     def __add__(self, other):
         res = Spectrum()
         res.confs = self.confs + other.confs
+        if res.confs: res.empty = False
         res.sort_confs()
         res.merge_confs()
         res.label = self.label + ' + ' + other.label
