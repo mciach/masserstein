@@ -8,7 +8,8 @@ import re
 from collections import Counter
 import numpy.random as rd
 from scipy.signal import argrelmax
-from .peptides import get_protein_formula
+# from .peptides import get_protein_formula
+from peptides import get_protein_formula
 from warnings import warn
 
 class Spectrum:
@@ -167,7 +168,7 @@ class Spectrum:
         """
         Merges configurations with an identical mass, summing their intensities.
         """
-        if self.confs: 
+        if self.confs:
             cmass = self.confs[0][0]
             cprob = 0.0
             ret = []
@@ -270,7 +271,7 @@ class Spectrum:
         for i in range(len(self.confs)):
             e += min(self.confs[i][1],other.confs[i][1])
         return e
-
+    
     def bin_to_nominal(self, nb_of_digits=0):
         """
         Rounds mass values to a given number of decimal digits.
@@ -756,46 +757,47 @@ class Spectrum:
 
 
 if __name__=="__main__":
-    import matplotlib.pyplot as plt
-    from copy import deepcopy
-    S = Spectrum(formula="C2H5OH", threshold=0.01)
+    pass
+    # import matplotlib.pyplot as plt
+    # from copy import deepcopy
+    # S = Spectrum(formula="C2H5OH", threshold=0.01)
 
-    S.add_chemical_noise(4, 0.2)
-    S.plot()
+    # S.add_chemical_noise(4, 0.2)
+    # S.plot()
 
-    sd = 0.01
-    C = deepcopy(S)
-    C = C*(np.sqrt(2*np.pi)*sd)**-1
-    S1 = deepcopy(S)
-    S.gaussian_smoothing(0.01,  0.001)
-    S1.fuzzify_peaks(0.01, 0.001)
-    S.plot(profile=True, show=False)
-    S1.plot(profile=True, show=False)
-    C.plot(show=False)
-    plt.show()
+    # sd = 0.01
+    # C = deepcopy(S)
+    # C = C*(np.sqrt(2*np.pi)*sd)**-1
+    # S1 = deepcopy(S)
+    # S.gaussian_smoothing(0.01,  0.001)
+    # S1.fuzzify_peaks(0.01, 0.001)
+    # S.plot(profile=True, show=False)
+    # S1.plot(profile=True, show=False)
+    # C.plot(show=False)
+    # plt.show()
 
-    T = Spectrum(confs=[(1, 1)])
-    T.gaussian_smoothing(0.01, np.array([0.96, 0.97, 0.98, 0.99, 1, 1.01, 1.02]))
-    T.plot(profile=True, show=False)
-    T = Spectrum(confs=[(1, 1)])
-    T.gaussian_smoothing(0.01, 0.001)
-    T.plot(profile=True)
+    # T = Spectrum(confs=[(1, 1)])
+    # T.gaussian_smoothing(0.01, np.array([0.96, 0.97, 0.98, 0.99, 1, 1.01, 1.02]))
+    # T.plot(profile=True, show=False)
+    # T = Spectrum(confs=[(1, 1)])
+    # T.gaussian_smoothing(0.01, 0.001)
+    # T.plot(profile=True)
 
-    target_mz = np.linspace(45, 56, num=100)
-    R = S.resample(target_mz)
-    plt.subplot(221)
-    S.plot(show=False, profile=True)
-    plt.subplot(222)
-    R.plot(show=False, profile=True)
-    plt.subplot(223)
-    S.plot(show=False, profile=True)
-    plt.plot([mz for mz, intsy in S.confs],
-                   [intsy for mz, intsy in S.confs],
-                   'r.')
-    plt.subplot(224)
-    R.plot(show=False, profile=True)
-    plt.plot([mz for mz, intsy in R.confs],
-                   [intsy for mz, intsy in R.confs],
-                   'r.')
-    plt.tight_layout()
-    plt.show()
+    # target_mz = np.linspace(45, 56, num=100)
+    # R = S.resample(target_mz)
+    # plt.subplot(221)
+    # S.plot(show=False, profile=True)
+    # plt.subplot(222)
+    # R.plot(show=False, profile=True)
+    # plt.subplot(223)
+    # S.plot(show=False, profile=True)
+    # plt.plot([mz for mz, intsy in S.confs],
+    #                [intsy for mz, intsy in S.confs],
+    #                'r.')
+    # plt.subplot(224)
+    # R.plot(show=False, profile=True)
+    # plt.plot([mz for mz, intsy in R.confs],
+    #                [intsy for mz, intsy in R.confs],
+    #                'r.')
+    # plt.tight_layout()
+    # plt.show()

@@ -8,7 +8,7 @@ from copy import deepcopy
 import numpy as np
 from tqdm import tqdm 
 from collections import Counter, OrderedDict
-from model_selection import get_composition
+from masserstein.model_selection import get_composition
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.lines import Line2D
@@ -107,26 +107,7 @@ Spectrum._gaussian_smoothing = _gaussian_smoothing
 
 ############################################################################################################################################
 #plots
-
 def plot(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=True, verbose=True):
-  
-  colors = cycle(['royalblue']+list('grcmy')+['orange', 'fuchsia', 'b'])
-  model = zip(proportions, query_spectra)
-  model = sorted(model, reverse=True, key=lambda p_q: p_q[0])
-
-  empirical_spectrum.plot(color= "k", linewidth=1, linestyle="-", alpha=1, show=False)
-
-  for p, s in model:
-    if p < threshold or p == 0: break
-    (p*reduce(s)).plot(show=False, linewidth=3, color=next(colors), alpha=0.7)
-    if verbose: print(f"{100*p:.2f}%: {s.label}")
-
-  if legend==True:
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
-  plt.ylabel('Signal intensity')
-  plt.xlabel('m/z')
-
-def plot_black_reversed(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=True, verbose=True):
   
   colors = cycle(['royalblue']+list('grcmy')+['orange', 'fuchsia', 'b'])
   model = zip(proportions, query_spectra)
@@ -145,34 +126,6 @@ def plot_black_reversed(empirical_spectrum, query_spectra, proportions, threshol
   plt.xlabel('m/z')
 
 def plot_sum_regressed(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=True):
-
-  colors = cycle(['royalblue']+list('grcmyk')+['orange', 'fuchsia', 'b'])
-  model = zip(proportions, query_spectra)
-  model = sorted(model, reverse=True, key=lambda p_q: p_q[0])
-  
-  #sum spectra 
-  sum_spectra = []
-  for p, s in model:
-    if p < threshold or p == 0: break
-    sum_spectra.append(p*reduce(s))
-
-  #process sum of spectra
-  sum_spectra = np.sum(sum_spectra)
-  sum_spectra = reduce(sum_spectra)
-  sum_spectra.label = "Sum of regressed spectra"
-
-  #plot sum of expected spectra
-  empirical_spectrum.plot(color="k", linewidth=1, show=False)
-  sum_spectra.plot(linewidth=3, color=next(colors), alpha=0.6, show=False)
-  if legend==True:
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
-    #plt.legend(loc=0, ncol=1)
-  plt.ylabel('Signal intensity')
-  plt.xlabel('m/z')
-
-  return sum_spectra
-
-def plot_sum_regressed_reversed(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=True):
 
   model = zip(proportions, query_spectra)
   model = sorted(model, reverse=True, key=lambda p_q: p_q[0])
@@ -448,9 +401,7 @@ def monomer_frequency(df):
   return a_freq, b_freq
 
 def estimate_homocoupling(df):
-
   """HC simple"""
-
   df = df.T
   c = df.columns[0]
   df = df[df[c]>0]
@@ -465,9 +416,7 @@ def estimate_homocoupling(df):
   return all_homocoupling
 
 def homocoupling_proportion(df):
-
   """HP - the sum of proportions for which |m-n| > 1."""
-
   df = df.T
   c = df.columns[0]
   df = df[df[c]>0]
@@ -483,9 +432,7 @@ def homocoupling_proportion(df):
   return hc_proportion
 
 def estimate_minimal_homocoupling(df, a_end_groups=None, b_end_groups=None, other_end_groups=None):
-
   """HC constrained"""
-
   if not a_end_groups: a_end_groups = ["Br", "Methyl"] #BT end groups
   if not b_end_groups: b_end_groups = ["Stannyl"] #TT end groups
   if not other_end_groups: other_end_groups = ["H", "Phenyl", "Orthothyl"] #non determinating
@@ -607,7 +554,6 @@ def load_centroided_spectrum(centroided_spectrum_path, spectrum_label):
 
   polymer_spectrum = Spectrum(confs=spectrum_confs, label=spectrum_label)
   polymer_spectrum.normalize()
-
   return polymer_spectrum
 
 def parse_annotation_results(annotation_file_path, polymer_info_path, centroided_spectra_paths:List, centroided_spectra_labels:List, expert_annotations=None):
@@ -661,8 +607,10 @@ def plot_annotations_hc(proportions,
                      hc_types,
                      cmap = 'tab20',
                      proportion_threshold = 0.005,
+                     group_width_for_top_peak=25,
                      group_width = 20,
                      vertical_separation = 0.001,
+                     figsize = (12, 7),
                      endgroup_alt_names=None,
                      ):
   """  
@@ -676,9 +624,12 @@ def plot_annotations_hc(proportions,
     and the monoisotopic mass for the polymers, in the same order as `endgroup_integer_coding`
   6. Float `proportion_threshold` 
     - polymers with proportions above threshold will be visualized. Default 0.005.
-  7. Float `group_width`
+  7. Float `group_width_for_top_peak`
+    - distance from the mass of reference polymer within which we search for the closest top peak from experimental spectrum. 
+    Default 25.
+  8. Float `group_width`
     - polymers within this distance will be treated as a single group and plotted together. Default 20.
-  8. Float `vertical_separation`
+  9. Float `vertical_separation`
     - parameter that controls the verical distance between points in the same group. Default 0.001.
   """
 
@@ -734,19 +685,23 @@ def plot_annotations_hc(proportions,
   # Group polymers with similar masses, and calculate the horizontal and vertical positions of the visualization of bt/tt counts on the spectrum.
   vertical_positions = []
   horizontal_positions = []
-  group_index = [0]
-  for ms, prev_ms in zip(masses_to_plot, [0]+masses_to_plot[:-1]):
-      experimental_nbh = [cf for cf in polymer_spectrum.confs if abs(ms-cf[0]) < group_width]
-      top_peak = max(experimental_nbh, key=lambda x: x[1])
-      if abs(ms - prev_ms) < group_width:
+  group_index = [-1]
+  top_peak_mz = [0]
+  for ms, prev_ms in zip(masses_to_plot, [0] + masses_to_plot[:-1]):
+      experimental_nbh = [cf for cf in polymer_spectrum.confs if abs(ms-cf[0]) <= group_width_for_top_peak] 
+      top_peak = max(experimental_nbh, key=lambda x: x[1]) # finding hifhest peak in the group
+      if abs(top_peak_mz[-1] - top_peak[0]) <= group_width:
           vertical_positions.append(vertical_positions[-1] + vertical_separation)
           horizontal_positions.append(horizontal_positions[-1])
           group_index.append(group_index[-1])
+          top_peak_mz.append(top_peak_mz[-1])
       else:
           vertical_positions.append(top_peak[1] + vertical_separation)
           horizontal_positions.append(top_peak[0])
           group_index.append(group_index[-1] + 1)
+          top_peak_mz.append(top_peak[0])
   group_index = group_index[1:]
+  top_peak_mz = top_peak_mz[1:]
 
   # We'll sort polymers in groups with respect to their estimated proportions.
   all_groups = set(group_index)
@@ -780,124 +735,6 @@ def plot_annotations_hc(proportions,
   hc_types_colors = list(set((hc_type, cmap(hc_code)) for hc_type, hc_code in zip(hc_types_to_plot, hc_types_encoding_to_plot)))
   hc_types_colors.sort()
   hc_types_colors = list(map(lambda x: (hc_types_map(x[0]), x[1]), hc_types_colors))
-
-  legend_handles = [Line2D([0],
-                          [0], 
-                          linewidth=3, 
-                          c=hc_color, 
-                          label=hc_label) for hc_label, hc_color in hc_types_colors]
-  legend1 = ax.legend(handles = legend_handles, 
-                      title = 'Homocoupling', 
-                      bbox_to_anchor=(1., 1.), 
-                      loc='upper right',
-                      ncol=2)
-
-  plt.title(f'Numbers of BT / TT subunits for {polymer_spectrum.label} spectrum')
-
-  max_prop = max(vertical_positions)
-  ax.set_ylim(0 - 0.01*max_prop, 1.1*max_prop)
-  ax.set_xlim(round(polymer_spectrum.confs[0][0])-40, round(polymer_spectrum.confs[-1][0])+20)
-  plt.tight_layout()
-
-##########################################################################################################################
-##########################################################################################################################
-
-def plot_annotations_hc_old(proportions, 
-                     polymer_spectrum, 
-                     endgroup_integer_coding, 
-                     all_different_endgroups_parsed, 
-                     bt_count, 
-                     tt_count, 
-                     masses,
-                     hc_types_integer_coding,
-                     all_different_hc_types_parsed,
-                     proportion_threshold = 0.005,
-                     group_width = 20,
-                     vertical_separation = 0.001,
-                     endgroup_alt_names=None,
-                     ):
-  """  
-  1. A vector of proportions `proportions` estimated with masserstein
-  2. A `masserstein.Spectrum` object `polymer_spectrum` with the experimental spectrum  
-  3. A vector of polymer endgroups coded as integers `endgroup_integer_coding` 
-  4. A vector `all_different_endgroups_parsed` containing the names of endgroups, 
-    in order corresponding to the encoding in `endgroup_integer_coding`, 
-    so that endgroup encoded as 0 corresponds to `all_different_endgroups_parsed[0]`
-  5. Vectors `bt_count`, `tt_count`, and `masses` containing the numbers of bt subunits, tt subunits, 
-    and the monoisotopic mass for the polymers, in the same order as `endgroup_integer_coding`
-  6. Float `proportion_threshold` 
-    - polymers with proportions above threshold will be visualized. Default 0.005.
-  7. Float `group_width`
-    - polymers within this distance will be treated as a single group and plotted together. Default 20.
-  8. Float `vertical_separation`
-    - parameter that controls the verical distance between points in the same group. Default 0.001.
-  """
-
-  # Select the information about the polymers to show on the spectrum:
-  is_over_threshold = [p > proportion_threshold for p in proportions]
-  props_to_plot = [p for p, t in zip(proportions, is_over_threshold) if t]
-  endgroup_coding_to_plot = [p for p, t in zip(endgroup_integer_coding, is_over_threshold) if t]
-  endgroups_to_plot = [all_different_endgroups_parsed[egr] for egr in endgroup_coding_to_plot]
-  endgroups_to_plot = [egr.split('+') for egr in endgroups_to_plot]
-  if endgroup_alt_names:
-      # endgroups_to_plot = [f"({endgroup_alt_names[egr[0][1:]]},{endgroup_alt_names[egr[0][1:]]})" if len(egr)==1 else f"({endgroup_alt_names[egr[0]]},{endgroup_alt_names[egr[1]]})" for egr in endgroups_to_plot]
-      endgroups_to_plot = [f"2{endgroup_alt_names[egr[0][1:]]}" if len(egr)==1 else f"{endgroup_alt_names[egr[0]]},{endgroup_alt_names[egr[1]]}" for egr in endgroups_to_plot]
-
-  else:
-      endgroups_to_plot = [f"2{egr[0][1:]},{egr[0][1:]}" if len(egr)==1 else f"{egr[0]},{egr[1]}" for egr in endgroups_to_plot]
-  bt_count_to_plot = [p for p, t in zip(bt_count, is_over_threshold) if t]
-  tt_count_to_plot = [p for p, t in zip(tt_count, is_over_threshold) if t]
-  masses_to_plot = [p for p, t in zip(masses, is_over_threshold) if t]
-  hc_types_coding_to_plot = [p for p, t in zip(hc_types_integer_coding, is_over_threshold) if t]
-
-  # Group polymers with similar masses, and calculate the horizontal and vertical positions of the visualization of bt/tt counts on the spectrum.
-  vertical_positions = []
-  horizontal_positions = []
-  group_index = [0]
-  for ms, prev_ms in zip(masses_to_plot, [0]+masses_to_plot[:-1]):
-      experimental_nbh = [cf for cf in polymer_spectrum.confs if abs(ms-cf[0]) < group_width]
-      top_peak = max(experimental_nbh, key=lambda x: x[1])
-      if abs(ms - prev_ms) < group_width:
-          vertical_positions.append(vertical_positions[-1] + vertical_separation)
-          horizontal_positions.append(horizontal_positions[-1])
-          group_index.append(group_index[-1])
-      else:
-          vertical_positions.append(top_peak[1] + vertical_separation)
-          horizontal_positions.append(top_peak[0])
-          group_index.append(group_index[-1] + 1)
-  group_index = group_index[1:]
-
-  # We'll sort polymers in groups with respect to their estimated proportions.
-  all_groups = set(group_index)
-  for group in all_groups:
-      group_coords = [i for i, g in enumerate(group_index) if g == group]
-      assert group_coords[-1] - group_coords[0] == len(group_coords) - 1, 'non-consecutive group'
-      props_in_group = [(i, props_to_plot[i]) for i in group_coords]
-      sorted_props = sorted(props_in_group, key = lambda x : x[1])
-      sorted_positions = sorted(vertical_positions[g] for g in group_coords)
-      for (g, p), vp in zip(sorted_props, sorted_positions): 
-          vertical_positions[g] = vp
-
-  fig, ax = plt.subplots(figsize=(12,7))
-  polymer_spectrum.plot(show=False, color='k')
-  legend_handles = []
-  for bt, tt, h, v, e, p, hc in zip(bt_count_to_plot, 
-                                tt_count_to_plot, 
-                                horizontal_positions, 
-                                vertical_positions,
-                                endgroups_to_plot, 
-                                props_to_plot,
-                                hc_types_coding_to_plot):
-      ax.text(h, v, 
-              s=f"{bt}BT+{tt}TT\n{e}",
-              c=cm.tab20(hc), 
-              rotation=90,
-              horizontalalignment='center',
-              verticalalignment='top',
-              fontsize=7)  # adjust the fonts size as needed
-
-  hc_types_colors = list(set((all_different_hc_types_parsed[hc], cm.tab20(hc)) for hc in hc_types_coding_to_plot))
-  hc_types_colors.sort(key = lambda i: all_different_hc_types_parsed.index(i[0]))
 
   legend_handles = [Line2D([0],
                           [0], 
