@@ -1,19 +1,14 @@
 import os 
-from glob import glob
-from pprint import pprint
 from pyteomics import mzxml
 from spectrum import Spectrum
 import pandas as pd
 from copy import deepcopy
 import numpy as np
-from tqdm import tqdm 
-from collections import Counter, OrderedDict
-from masserstein.model_selection import get_composition
+from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.lines import Line2D
-import functools
-from itertools import cycle, combinations_with_replacement, combinations
+from itertools import cycle, combinations_with_replacement
 from warnings import warn
 from typing import Dict, List, Tuple
 
@@ -31,33 +26,29 @@ def load_mzxml(path, huge_tree=False):
         This option is passed to the lxml parser and defines whether security checks for XML tree depth and node size should be disabled.
         Default is False. Enable this option for trusted files to avoid XMLSyntaxError exceptions
   """
-  if huge_tree==True:
-    data = list(mzxml.read(path, huge_tree=True))
-  else:
-    data = list(mzxml.read(path))
-  assert len(data) == 1
-  data = data[0]  
+  if huge_tree==True: data = list(mzxml.read(path, huge_tree=True))
+  else: data = list(mzxml.read(path))
   
+  assert len(data) == 1
+  
+  data = data[0]  
   mz = data['m/z array']
   i = data['intensity array']
-  
   nonzero = i > 0
-  
   confs = list(zip(mz, i))
   s = Spectrum('', empty=True, label=os.path.split(path)[-1])
   print(f"{s.label:16} loaded: {len(confs)} ({100*nonzero.mean():.2f}% non-zero) datapoints in {path}")
   s.set_confs(confs)
   return s
 
-def restrict(spectrum, mz_min, mz_max):
+def restrict(spectrum:Spectrum, mz_min:float, mz_max:float):
   mz, i = np.array(spectrum.confs).T
   ix = (mz_min <= mz) & (mz <= mz_max)
   spectrum = deepcopy(spectrum)
   spectrum.confs = list(zip(mz[ix], i[ix]))
   return spectrum
 
-
-def correct_baseline(spectrum, base=1000):
+def correct_baseline(spectrum:Spectrum, base=1000):
   mz, i = np.array(spectrum.confs).T
   i -= (i.min() + base)
   i[np.where(i<=0)] = abs(0.001*i.mean())
@@ -66,23 +57,23 @@ def correct_baseline(spectrum, base=1000):
   spectrum.confs = list(zip(mz, i))
   return spectrum
 
-def centroided(spectrum, max_width=1, peak_height_fraction=0.5):
+def centroided(spectrum:Spectrum, max_width=1, peak_height_fraction=0.5):
   """[0] - only centroided peak intensity needed"""
   centroided, _ = spectrum.centroid(max_width=max_width, peak_height_fraction=peak_height_fraction)
   return Spectrum(confs=centroided, label=spectrum.label)
 
-def reduce(s):
-  mz = np.array(s.confs)[:, 0]
+def reduce(spectrum:Spectrum):
+  mz = np.array(spectrum.confs)[:, 0]
   gb = (mz - (mz%1).mean() - .5 )//1
   gb = pd.DataFrame(s.confs).groupby(gb)
   mz = gb.mean()[0]
   i  = gb.sum()[1]
   confs = list(zip(mz.values, i.values))
-  s = deepcopy(s)
-  s.confs = confs
-  return s
+  spectrum = deepcopy(spectrum)
+  spectrum.confs = confs
+  return spectrum
 
-def remove_low_signal(spectrum, signal_proportion = 0.001):
+def remove_low_signal(spectrum:Spectrum, signal_proportion = 0.001):
     signal_thr = signal_proportion * spectrum.get_modal_peak()[1]
     filtered_confs = []
     for mz, i in spectrum.confs:
@@ -92,22 +83,9 @@ def remove_low_signal(spectrum, signal_proportion = 0.001):
     new_spectrum.confs = filtered_confs
     return new_spectrum
 
-def _normalize(self):
-  self = deepcopy(self)
-  self.normalize()
-  return self
-
-def _gaussian_smoothing(self, sd=0.01, new_mz=0.01):
-  self = deepcopy(self)
-  self.gaussian_smoothing(sd, new_mz)
-  return self
-
-Spectrum._normalize = _normalize
-Spectrum._gaussian_smoothing = _gaussian_smoothing
-
 ############################################################################################################################################
 #plots
-def plot(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=True, verbose=True):
+def plot(empirical_spectrum:Spectrum, query_spectra:List[Spectrum], proportions:List[float], threshold=1e-2, legend=True, verbose=True):
   
   colors = cycle(['royalblue']+list('grcmy')+['orange', 'fuchsia', 'b'])
   model = zip(proportions, query_spectra)
@@ -125,7 +103,7 @@ def plot(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=
   plt.ylabel('Signal intensity')
   plt.xlabel('m/z')
 
-def plot_sum_regressed(empirical_spectrum, query_spectra, proportions, threshold=1e-2, legend=True):
+def plot_sum_regressed(empirical_spectrum:Spectrum, query_spectra:List[Spectrum], proportions:List[float], threshold=1e-2, legend=True):
 
   model = zip(proportions, query_spectra)
   model = sorted(model, reverse=True, key=lambda p_q: p_q[0])
@@ -153,35 +131,20 @@ def plot_sum_regressed(empirical_spectrum, query_spectra, proportions, threshold
 ############################################################################################################################################
 
 # Generating theorethical spectra
-# multiplication 
-Counter.__mul__ = lambda self, x: sum([self]*x, Counter())
+  
+class MCounter(Counter):
+    """This is a slight extention of the ``Collections.Counter`` class
+    to also allow multiplication with integers."""
+
+    def __mul__(self, other):
+      if not isinstance(other, int):
+          raise TypeError("Non-int factor")
+      return MCounter({k: other * v for k, v in self.items()})
 
 def formula_from_dict(d):
   return ''.join(f"{k}{v}" for k, v in d.items())
 
-# Example
-
-# bt = Counter(C=36, H=60, S=2)
-# bt_16 = Counter(C=40, H=68, S=2)
-# tt = Counter(C=6, H=2, S=2)
-# dtt = Counter(C=8, H=2, S=3)
-# end_groups = dict(
-#   Stannyl = Counter(C=3, H=9, Sn=1),
-#   Br = Counter(Br=1),
-#   H = Counter(H=1),
-#   Methyl = Counter(C=1, H=3),
-#   Phenyl = Counter(C=6, H=5),
-#   # Orthothyl = Counter(C=7, H=7),
-# )
-
-# #we assume there will be only one adduct
-# adducts = dict(
-#     H = Counter(H=1),
-#     Na = Counter(Na=1),
-#     K = Counter(K=1),
-# )
-
-def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_groups:Dict, min_mz, max_mz, max_count_diff, adducts=None, verbose=False):
+def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_groups:Dict, min_mz:float, max_mz:float, max_count_diff:int, adducts=None, verbose=False):
 
   """
   _____
@@ -219,7 +182,7 @@ def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_gro
               label = f"{a_count}{A}+{b_count}{B}+{end_group_name1}+{end_group_name2}+{adduct_name}"
             #generating spectrum 
             s = Spectrum(formula=formula_from_dict(f), label=label)
-            if min_mz <= s.confs[0][0] <= max_mz:
+            if min_mz <= s.confs[0][0] <= max_mz: #whether theorethical spectrum is in interval of interest
               s.normalize()
               possible_compounds.append(s)
             # if min_mz <= s.confs[0][0] and s.confs[-1][0] <= max_mz: #whether theorethical spectrum is in interval of interest
@@ -233,7 +196,7 @@ def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_gro
             label = f"{a_count}{A}+{b_count}{B}+{end_group_name1}+{end_group_name2}"
           #generating spectrum 
           s = Spectrum(formula=formula_from_dict(f), label=label)
-          if min_mz <= s.confs[0][0] <= max_mz:
+          if min_mz <= s.confs[0][0] <= max_mz: #whether theorethical spectrum is in interval of interest
             s.normalize()
             possible_compounds.append(s)
           # if min_mz <= s.confs[0][0] and s.confs[-1][0] <= max_mz: #whether theorethical spectrum is in interval of interest
@@ -262,7 +225,7 @@ def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_gro
 
 ############################################################################################################################################
 
-def generate_costs_by_end_group(reference_spectra, end_groups_costs:Dict):
+def generate_costs_by_end_group(reference_spectra: List[Spectrum], end_groups_costs:Dict) -> List[float]:
     """
     Generates list with costs of each spectum from given lists of reference spectra
     based on provided costs of end groups. If there are labels of spectra missing it raises exception.
@@ -279,7 +242,7 @@ def generate_costs_by_end_group(reference_spectra, end_groups_costs:Dict):
         while values are costs of this end groups configuration. 
     _____
     Returns:
-    costs: List[Float]
+    costs: List[float]
         list of costs values corresponding to given list of reference spectra.
     """
     costs = []
@@ -303,23 +266,19 @@ def generate_costs_by_end_group(reference_spectra, end_groups_costs:Dict):
       warn("""Some labels don't follow required naming convention, thus they were assign costs = 0.
       Check whether label naming convention follows the one from polymers.get_possible_compounds function.
       """)
-
-    return costs
-
-def generate_2Phenyl_costs(reference_spectra, cost_2Phenyl):
-    costs = []
-    for spectrum in reference_spectra:
-        label = spectrum.label.split("+")
-        if label[-1]=="2Phenyl":
-            costs.append(cost_2Phenyl)
-        else:
-            costs.append(0)
     return costs
 
 ############################################################################################################################################
 
 # Average cost of 2 phenyls
-def average_2Phenyl_cost(heavier_monomer:Tuple, lighter_monomer:Tuple, end_groups:Dict, min_mz, max_mz, max_count_diff, verbose=False):
+def average_2Phenyl_cost(heavier_monomer:Tuple, lighter_monomer:Tuple, end_groups:Dict, min_mz:float, max_mz:float, max_count_diff:int, verbose=False):
+    """Helper function to estimate average cost of polymers with 2 Phenyl endgroups based on the average Wasserstain distance 
+    between mBT+(n+1)TT+H+Methyl and mBT+nTT+2Phenyl spectra.
+    _____
+        Parameters:
+    _____
+        Returns:
+    """
     
     A, a, = heavier_monomer 
     B, b = lighter_monomer
@@ -351,7 +310,7 @@ def average_2Phenyl_cost(heavier_monomer:Tuple, lighter_monomer:Tuple, end_group
     return np.mean(phenyl_2_costs), reference_spectra
 
 ############################################################################################################################################
-# homocoupling
+# Homocoupling measures
 
 def homocoupling_frequency(df):
   df = df.T
@@ -431,8 +390,13 @@ def homocoupling_proportion(df):
       hc_proportion += prob
   return hc_proportion
 
-def estimate_minimal_homocoupling(df, a_end_groups=None, b_end_groups=None, other_end_groups=None):
-  """HC constrained"""
+def estimate_constrained_homocoupling(df, a_end_groups=None, b_end_groups=None, other_end_groups=None):
+  """HC constrained - estimates homocoupling level assuming that certain polymer endgroups determine which monomer is present at the end of the chain.
+  _____
+      Parameters:
+  _____
+      Returns:
+  """
   if not a_end_groups: a_end_groups = ["Br", "Methyl"] #BT end groups
   if not b_end_groups: b_end_groups = ["Stannyl"] #TT end groups
   if not other_end_groups: other_end_groups = ["H", "Phenyl", "Orthothyl"] #non determinating
@@ -543,7 +507,20 @@ def estimate_minimal_homocoupling(df, a_end_groups=None, b_end_groups=None, othe
 ############################################################################################################################################
 # Parse and visualize annotations
 
-def load_centroided_spectrum(centroided_spectrum_path, spectrum_label):
+def load_centroided_spectrum(centroided_spectrum_path:str, spectrum_label:str = ""):
+  """
+  Creates Spectrum object from csv file where the first line contains m/z values and second contains corresponding intensities.
+  _____
+      Parameters:
+      centroided_spectrum_path: str
+          path to the csv file with centroided spectrum, 
+          where the first line contains m/z values and second contains corresponding intensities.
+      spectrum_label: str
+          name of the spectrum, default="".
+  _____
+      Returns: Spectrum object
+
+  """
   # Load spectra
   spectrum = open(centroided_spectrum_path)
   spectrum_mz = next(spectrum)
@@ -556,7 +533,24 @@ def load_centroided_spectrum(centroided_spectrum_path, spectrum_label):
   polymer_spectrum.normalize()
   return polymer_spectrum
 
-def parse_annotation_results(annotation_file_path, polymer_info_path, centroided_spectra_paths:List, centroided_spectra_labels:List, expert_annotations=None):
+def parse_annotation_results(annotation_file_path:str, 
+                             polymer_info_path:str, 
+                             centroided_spectra_paths:List[str], 
+                             centroided_spectra_labels:List[str], 
+                             expert_annotations=None):
+  
+  """Function parses annotation results and returns them in the format needed for plotting with ``plot_annotations_hc`` or ``plot_annotations_endgroups``
+  _____
+      Parameters:
+      annotation_file_path: str
+          path to the csv file with Masserstein annotation results - estimated proportions of reference spectra (columns) in experimental spectrum (rows),
+      polymer_info_path: str
+          path to the csv file with names of reference spectra with the smallest mass present in their isothopic envelopes.
+      centroided_spectra_paths: List[str]
+          list consisting of paths to centroided
+  _____
+      Returns: Spectrum object
+  """
   
   # Parse annotation results
   annot_file = open(annotation_file_path)
@@ -714,7 +708,7 @@ def plot_annotations_hc(proportions,
       for (g, p), vp in zip(sorted_props, sorted_positions): 
           vertical_positions[g] = vp
 
-  fig, ax = plt.subplots(figsize=(12,7))
+  fig, ax = plt.subplots(figsize=figsize)
   polymer_spectrum.plot(show=False, color='k')
   legend_handles = []
   for bt, tt, h, v, e, p, hc in zip(bt_count_to_plot, 
@@ -757,7 +751,7 @@ def plot_annotations_hc(proportions,
 ##########################################################################################################################
 ##########################################################################################################################
 
-def plot_annotations(proportions, 
+def plot_annotations_endgroups(proportions, 
                      polymer_spectrum, 
                      endgroup_integer_coding, 
                      all_different_endgroups_parsed, 
@@ -767,6 +761,7 @@ def plot_annotations(proportions,
                      proportion_threshold = 0.005,
                      group_width = 20,
                      vertical_separation = 0.001,
+                     figsize=(10,4),
                      ):
   """  
   1. A vector of proportions `proportions` estimated with masserstein
@@ -783,6 +778,7 @@ def plot_annotations(proportions,
     - polymers within this distance will be treated as a single group and plotted together. Default 20.
   8. Float `vertical_separation`
     - parameter that controls the verical distance between points in the same group. Default 0.001.
+  9. Tuple with the figure's width and height
   """
 
   # Select the information about the polymers to show on the spectrum:
@@ -824,7 +820,7 @@ def plot_annotations(proportions,
           
   #plt.figure()
 
-  fig, ax = plt.subplots(figsize=(10,4))
+  fig, ax = plt.subplots(figsize=figsize)
   polymer_spectrum.plot(show=False, color='k')
   legend_handles = []
   for bt, tt, h, v, e, p in zip(bt_count_to_plot, 
