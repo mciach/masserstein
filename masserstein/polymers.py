@@ -583,7 +583,7 @@ def parse_annotation_results(annotation_file_path:str,
   polymer_spectra = {label: load_centroided_spectrum(path, label) for path, label in zip(centroided_spectra_paths, centroided_spectra_labels)}
      
   # Encode HC type as integers
-  hc_types = [0 if abs(tt-bt)<2 else tt-bt for bt, tt in zip(bt_count, tt_count)] # -1, 0, 1 - are the same category - no evidence of homocoupling
+  hc_types = [0 if abs(tt-bt)<2 else (tt-1)-bt if tt>bt else tt-(bt-1) for bt, tt in zip(bt_count, tt_count)] # -1, 0, 1 - are the same category - no evidence of homocoupling
   
   if expert_annotations: # Encode expert annotations
       #Check if in expert annotations the assign proportions == 1 other proportions 0
