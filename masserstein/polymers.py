@@ -627,15 +627,15 @@ def plot_annotations_hc(proportions,
     - parameter that controls the verical distance between points in the same group. Default 0.001.
   """
 
-  def hc_types_map(x):
-      """Takes tt - bt difference and returns string with the description of homocoupling type.
-      1.  -1, 0, 1 - are the same category - no evidence of homocoupling
-      2. >= 2 TT homocoupling
-      3. <= 2 BT homocoupling
+  def hc_types_map(x:int):
+      """Takes integer describing hc type for PBTTT polymers and returns string with the description of homocoupling type.
+      1. 0 - no evidence of homocoupling
+      2. >= 1 TT homocoupling
+      3. <= -1 BT homocoupling
       """
-      if x <= -2:
+      if x <= -1:
         return f"At least {abs(x)} BT-HC"
-      elif x >= 2:
+      elif x >= 1:
         return f"At least {abs(x)} TT-HC"
       else:
         return f"No evidence of HC"
