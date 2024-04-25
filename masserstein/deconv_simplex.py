@@ -7,7 +7,6 @@ import tempfile
 from tqdm import tqdm
 from pulp.apis import LpSolverDefault
 from masserstein import misc
-import polymers
 
 
 def intensity_generator(confs, mzaxis):
@@ -995,115 +994,109 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
 ##########################################################################################################
 
 if __name__=="__main__":
+    pass
 
-    # for tests
-    import plotly.graph_objects as go
-    import matplotlib.pyplot as plt
-    import os
-    from glob import glob
-    from copy import deepcopy
+    # # for tests
+    # import matplotlib.pyplot as plt
+    # import os
+    # from copy import deepcopy
 
-    def _normalize(self):
-        self = deepcopy(self)
-        self.normalize()
-        return self
+    # from  .polymers import *
 
-    def _gaussian_smoothing(self, sd=0.01, new_mz=0.01):
-        self = deepcopy(self)
-        self.gaussian_smoothing(sd, new_mz)
-        return self
+    # def _normalize(self):
+    #     self = deepcopy(self)
+    #     self.normalize()
+    #     return self
 
-    Spectrum._normalize = _normalize
-    Spectrum._gaussian_smoothing = _gaussian_smoothing
+    # def _gaussian_smoothing(self, sd=0.01, new_mz=0.01):
+    #     self = deepcopy(self)
+    #     self.gaussian_smoothing(sd, new_mz)
+    #     return self
 
-    #  WITH COSTS TESTS
-    pbttt_min_mz=3473
-    pbttt_max_mz=3512
+    # Spectrum._normalize = _normalize
+    # Spectrum._gaussian_smoothing = _gaussian_smoothing
 
-    spectra = []
-    names = []
+    # #  WITH COSTS TESTS
+    # pbttt_min_mz=3473
+    # pbttt_max_mz=3512
 
-    # fig = go.Figure() 
+    # spectra = []
+    # names = []
 
-    paths=["./polymer_examples/JV303-CB.mzXML"]
+    # # fig = go.Figure() 
 
-    for path in paths:
-        s = polymers.load_mzxml(path, huge_tree=True)
-        print(s.confs[0], s.confs[-1])
-        label = os.path.split(path)[-1]
-        label = label[:-6]
-        s = polymers.restrict(s, pbttt_min_mz-1, pbttt_max_mz+1)
-        if label == "C14_unknown":
-            s = polymers.correct_baseline(s, 15000)
-        elif label == "C14_unknown_7p": 
-            s = polymers.correct_baseline(s, 1500)
-        else:
-            s = polymers.correct_baseline(s, 1000)
-        s = s._gaussian_smoothing(sd=0.1)
+    # paths=["./polymer_examples/JV303-CB.mzXML"]
 
-        # mz, i = np.array(s.confs).T
-        # fig.add_trace(
-        #     go.Scattergl(x=mz, y=i, name=label)
-        # )
+    # for path in paths:
+    #     s = polymers.load_mzxml(path, huge_tree=True)
+    #     print(s.confs[0], s.confs[-1])
+    #     label = os.path.split(path)[-1]
+    #     label = label[:-6]
+    #     s = polymers.restrict(s, pbttt_min_mz-1, pbttt_max_mz+1)
+    #     if label == "C14_unknown":
+    #         s = polymers.correct_baseline(s, 15000)
+    #     elif label == "C14_unknown_7p": 
+    #         s = polymers.correct_baseline(s, 1500)
+    #     else:
+    #         s = polymers.correct_baseline(s, 1000)
+    #     s = s._gaussian_smoothing(sd=0.1)
 
-        s = polymers.centroided(s, max_width=0.75, peak_height_fraction=0.5)
-        s.label = label
+    #     s = polymers.centroided(s, max_width=0.75, peak_height_fraction=0.5)
+    #     s.label = label
 
-        spectra.append(s)
-        names.append(s.label)
+    #     spectra.append(s)
+    #     names.append(s.label)
 
-    # fig
+    # ########################################################################################################
+    # bt = polymers.Counter(C=36, H=60, S=2)
+    # bt_16 = polymers.Counter(C=40, H=68, S=2)
+    # tt = polymers.Counter(C=6, H=2, S=2)
+    # dtt = polymers.Counter(C=8, H=2, S=3)
+    # end_groups = dict(
+    #   Stannyl = polymers.Counter(C=3, H=9, Sn=1),
+    #   Br = polymers.Counter(Br=1),
+    #   H = polymers.Counter(H=1),
+    #   Methyl = polymers.Counter(C=1, H=3),
+    #   Phenyl = polymers.Counter(C=6, H=5),
+    #   # Orthothyl = Counter(C=7, H=7),
+    # )
+    # ########################################################################################################
 
-    ########################################################################################################
-    bt = polymers.Counter(C=36, H=60, S=2)
-    bt_16 = polymers.Counter(C=40, H=68, S=2)
-    tt = polymers.Counter(C=6, H=2, S=2)
-    dtt = polymers.Counter(C=8, H=2, S=3)
-    end_groups = dict(
-      Stannyl = polymers.Counter(C=3, H=9, Sn=1),
-      Br = polymers.Counter(Br=1),
-      H = polymers.Counter(H=1),
-      Methyl = polymers.Counter(C=1, H=3),
-      Phenyl = polymers.Counter(C=6, H=5),
-      # Orthothyl = Counter(C=7, H=7),
-    )
-    ########################################################################################################
+    # expected_spectra = polymers.get_possible_compounds(("BT",bt), ("TT", tt), end_groups, pbttt_min_mz, pbttt_max_mz, 5, verbose=True)
+    # x = 0.19
+    # # 0.04 interesting
+    # costs = [x/2, 0, x/2, 0, x/2, 0, x/2, x/2, 0, 0, x/2, 0]
+    # costs = [x, 0, 0, 0, 0]
 
-    expected_spectra = polymers.get_possible_compounds(("BT",bt), ("TT", tt), end_groups, pbttt_min_mz, pbttt_max_mz, 5, verbose=True)
-    x = 0.19
-    # 0.04 interesting
-    costs = [x/2, 0, x/2, 0, x/2, 0, x/2, x/2, 0, 0, x/2, 0]
-    costs = [x, 0, 0, 0, 0]
+    # spectrum = spectra[0]._normalize()
 
-    spectrum = spectra[0]._normalize()
+    # result_og = estimate_proportions(spectrum, expected_spectra, MTD = 0.6, MTD_th = 0.7, MDC = 1e-3)
+    # plt.figure(figsize=(10, 6))
+    # polymers.plot(spectrum, expected_spectra, result_og['proportions'])
+    # plt.tight_layout()
+    # plt.savefig(f"./figures/result_og_{x}.png")
+    # # plt.show()
+    # plt.close()
 
-    result_og = estimate_proportions(spectrum, expected_spectra, MTD = 0.6, MTD_th = 0.7, MDC = 1e-3)
-    plt.figure(figsize=(10, 6))
-    polymers.plot(spectrum, expected_spectra, result_og['proportions'])
-    plt.tight_layout()
-    plt.savefig(f"./figures/result_og_{x}.png")
-    # plt.show()
-    plt.close()
+    # plt.figure(figsize=(10, 6))
+    # polymers.plot_sum_regressed(spectrum, expected_spectra, result_og['proportions'])
+    # plt.tight_layout()
+    # plt.savefig(f"./figures/result_og_reg_{x}.png")
+    # # plt.show()
+    # plt.close()
 
-    plt.figure(figsize=(10, 6))
-    polymers.plot_sum_regressed(spectrum, expected_spectra, result_og['proportions'])
-    plt.tight_layout()
-    plt.savefig(f"./figures/result_og_reg_{x}.png")
-    # plt.show()
-    plt.close()
+    # result_costs =  estimate_proportions(spectrum, expected_spectra, costs = costs, MTD = 0.6, MTD_th = 0.7, MDC = 1e-3)
+    # plt.figure(figsize=(10, 6))
+    # plt.tight_layout()
+    # polymers.plot(spectrum, expected_spectra, result_costs['proportions'])
+    # plt.tight_layout()
+    # plt.savefig(f"./figures/result_cost_{x}.png")
+    # # plt.show()
+    # plt.close()
 
-    result_costs =  estimate_proportions(spectrum, expected_spectra, costs = costs, MTD = 0.6, MTD_th = 0.7, MDC = 1e-3)
-    plt.figure(figsize=(10, 6))
-    plt.tight_layout()
-    polymers.plot(spectrum, expected_spectra, result_costs['proportions'])
-    plt.tight_layout()
-    plt.savefig(f"./figures/result_cost_{x}.png")
-    # plt.show()
-    plt.close()
-
-    plt.figure(figsize=(10, 6))
-    polymers.plot_sum_regressed(spectrum, expected_spectra, result_costs['proportions'])
-    plt.tight_layout()
-    plt.savefig(f"./figures/result_cost_reg_{x}.png")
-    # plt.show()
-    plt.close()
+    # plt.figure(figsize=(10, 6))
+    # polymers.plot_sum_regressed(spectrum, expected_spectra, result_costs['proportions'])
+    # plt.tight_layout()
+    # plt.savefig(f"./figures/result_cost_reg_{x}.png")
+    # # plt.show()
+    # plt.close()

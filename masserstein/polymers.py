@@ -1,6 +1,6 @@
 import os 
 from pyteomics import mzxml
-from spectrum import Spectrum
+from .spectrum import Spectrum
 import pandas as pd
 from copy import deepcopy
 import numpy as np
@@ -65,14 +65,14 @@ def centroided(spectrum:Spectrum, max_width=1, peak_height_fraction=0.5):
 def reduce(spectrum:Spectrum):
   mz = np.array(spectrum.confs)[:, 0]
   gb = (mz - (mz%1).mean() - .5 )//1
-  gb = pd.DataFrame(s.confs).groupby(gb)
+  gb = pd.DataFrame(spectrum.confs).groupby(gb)
   mz = gb.mean()[0]
   i  = gb.sum()[1]
   confs = list(zip(mz.values, i.values))
   spectrum = deepcopy(spectrum)
   spectrum.confs = confs
   return spectrum
-
+   
 def remove_low_signal(spectrum:Spectrum, signal_proportion = 0.001):
     signal_thr = signal_proportion * spectrum.get_modal_peak()[1]
     filtered_confs = []
@@ -82,6 +82,22 @@ def remove_low_signal(spectrum:Spectrum, signal_proportion = 0.001):
     new_spectrum = deepcopy(spectrum)
     new_spectrum.confs = filtered_confs
     return new_spectrum
+
+def _normalize(self):
+  """Returns new normalized Spectrum object"""
+  self = deepcopy(self)
+  self.normalize()
+  return self
+
+def jaccard(mass, expert):
+    intersection = len(set(mass).intersection(expert))
+    union = (len(mass) + len(expert)) - intersection
+    return intersection / union
+
+def jaccard_normalized(mass, expert):
+    intersection = len(set(mass).intersection(expert))
+    union = len(expert)
+    return intersection / union
 
 ############################################################################################################################################
 #plots
