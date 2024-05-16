@@ -14,7 +14,7 @@ from typing import Dict, List, Tuple
 
 ############################################################################################################################################
 
-def load_mzxml(path, huge_tree=False):
+def load_mzxml(path:str, huge_tree=False):
   """
   Loads spectrum from mzXML file.
   _____
@@ -89,12 +89,12 @@ def _normalize(self):
   self.normalize()
   return self
 
-def jaccard(mass, expert):
+def jaccard(mass:List[str], expert:List[str]):
     intersection = len(set(mass).intersection(expert))
     union = (len(mass) + len(expert)) - intersection
     return intersection / union
 
-def jaccard_normalized(mass, expert):
+def jaccard_normalized(mass:List[str], expert:List[str]):
     intersection = len(set(mass).intersection(expert))
     union = len(expert)
     return intersection / union
@@ -139,8 +139,7 @@ def plot_sum_regressed(empirical_spectrum:Spectrum, query_spectra:List[Spectrum]
   empirical_spectrum.plot(color= "k", linewidth=2, linestyle="-", alpha=0.7, show=False) #experimental - wider (or not) black
   sum_spectra.plot(color = "dodgerblue", linewidth=2, linestyle=(0, (2, 1, 2, 1)), alpha=0.9, show=False) # theorethical - thin, dashed, blue
   if legend==True:
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
-    #plt.legend(loc=0, ncol=1)
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')   
   plt.ylabel('Signal intensity')
   plt.xlabel('m/z')
 
@@ -156,12 +155,14 @@ class MCounter(Counter):
       if not isinstance(other, int):
           raise TypeError("Non-int factor")
       return MCounter({k: other * v for k, v in self.items()})
+    
+    def formula_from_counter(self):
+      return ''.join(f"{k}{v}" for k, v in self.items())
 
-def formula_from_dict(d):
+def formula_from_dict(d:MCounter):
   return ''.join(f"{k}{v}" for k, v in d.items())
 
-def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_groups:Dict, min_mz:float, max_mz:float, max_count_diff:int, adducts=None, verbose=False):
-
+def get_possible_compounds(heavier_monomer:Tuple[str, MCounter], lighter_monomer:Tuple[str, MCounter], end_groups:Dict[str:float], min_mz:float, max_mz:float, max_count_diff:int, adducts=None, verbose=False):
   """
   _____
   Parameters:
@@ -241,7 +242,7 @@ def get_possible_compounds(heavier_monomer:Tuple, lighter_monomer:Tuple, end_gro
 
 ############################################################################################################################################
 
-def generate_costs_by_end_group(reference_spectra: List[Spectrum], end_groups_costs:Dict) -> List[float]:
+def generate_costs_by_end_group(reference_spectra: List[Spectrum], end_groups_costs:Dict[str:float]) -> List[float]:
     """
     Generates list with costs of each spectum from given lists of reference spectra
     based on provided costs of end groups. If there are labels of spectra missing it raises exception.
@@ -287,11 +288,12 @@ def generate_costs_by_end_group(reference_spectra: List[Spectrum], end_groups_co
 ############################################################################################################################################
 
 # Average cost of 2 phenyls
-def average_2Phenyl_cost(heavier_monomer:Tuple, lighter_monomer:Tuple, end_groups:Dict, min_mz:float, max_mz:float, max_count_diff:int, verbose=False):
+def average_2Phenyl_cost(heavier_monomer:Tuple[str, MCounter], lighter_monomer:Tuple[str, MCounter], end_groups:Dict, min_mz:float, max_mz:float, max_count_diff:int, verbose=False):
     """Helper function to estimate average cost of polymers with 2 Phenyl endgroups based on the average Wasserstain distance 
     between mBT+(n+1)TT+H+Methyl and mBT+nTT+2Phenyl spectra.
     _____
         Parameters:
+          heavier_monomer: tuple(monomer_name, Counte)
     _____
         Returns:
     """
@@ -328,26 +330,33 @@ def average_2Phenyl_cost(heavier_monomer:Tuple, lighter_monomer:Tuple, end_group
 ############################################################################################################################################
 # Homocoupling measures
 
-def homocoupling_frequency(df):
+def homocoupling_frequency(df, thr=0):
+  assert thr >= 0
+
   df = df.T
   c = df.columns[0]
-  df = df[df[c]>0]
+  df = df[df[c]>thr]
   df = df.reset_index()
   df = df.rename(columns={"index": "polymer"})
+
   homocoupling = []
   for polymer in df["polymer"]:
     polymer = polymer.split("+")
     a_count = int(polymer[0][:(len(polymer[0]) - 2)]) 
     b_count = int(polymer[1][:(len(polymer[1]) - 2)])
     homocoupling.append(b_count-a_count)
+
   return homocoupling
 
-def monomer_difference_frequency(df):
+def monomer_difference_frequency(df, thr=0):
+  assert thr >= 0
+
   df = df.T
   c = df.columns[0]
-  df = df[df[c]>0]
+  df = df[df[c]>thr]
   df = df.reset_index()
   df = df.rename(columns={"index": "polymer"})
+
   monomer_difference = {}
   for prob, polymer in zip(df[c], df["polymer"]):
     polymer = polymer.split("+")
@@ -356,14 +365,56 @@ def monomer_difference_frequency(df):
     diff = b_count-a_count
     if diff in monomer_difference: monomer_difference[diff] += prob
     else: monomer_difference[diff] = prob
+
   return monomer_difference
 
-def monomer_frequency(df):
+
+def monomer_difference_frequency_by_end_group(df, thr=0):
+  assert thr >= 0
+
+  diff_min = 0
+  diff_max = 0
+
   df = df.T
   c = df.columns[0]
-  df = df[df[c]>0]
+  df = df[df[c]>thr]
   df = df.reset_index()
   df = df.rename(columns={"index": "polymer"})
+
+  #get end groups
+  all_end_groups = []
+  for polymer in df["polymer"]:
+      polymer = polymer.split("+")
+      if len(polymer)==3: end_groups = polymer[2]
+      else: end_groups = "+".join(polymer[2:])
+      all_end_groups.append(end_groups)
+  all_end_groups = list(set(all_end_groups))
+
+  monomer_difference = {end: {} for end in all_end_groups}
+  for prob, polymer in zip(df[c], df["polymer"]):
+      polymer = polymer.split("+")
+      a_count = int(polymer[0][:(len(polymer[0]) - 2)]) 
+      b_count = int(polymer[1][:(len(polymer[1]) - 2)])
+      diff = b_count-a_count
+      if len(polymer)==3: end_groups = polymer[2]
+      else: end_groups = "+".join(polymer[2:])
+      if diff in monomer_difference[end_groups]: monomer_difference[end_groups][diff] += prob
+      else: monomer_difference[end_groups][diff] = prob     
+      #save min and max
+      if diff < diff_min: diff_min = diff
+      if diff > diff_max: diff_max = diff    
+
+  return monomer_difference, diff_min, diff_max
+
+def monomer_frequency(df, thr=0):
+  assert thr >= 0
+
+  df = df.T
+  c = df.columns[0]
+  df = df[df[c]>thr]
+  df = df.reset_index()
+  df = df.rename(columns={"index": "polymer"})
+
   a_freq, b_freq = {}, {}
   for prob, polymer in zip(df[c], df["polymer"]):
     polymer = polymer.split("+")
@@ -373,30 +424,38 @@ def monomer_frequency(df):
     else: a_freq[a_count] = prob
     if b_count in b_freq: b_freq[b_count] += prob
     else: b_freq[b_count] = prob
+
   return a_freq, b_freq
 
-def estimate_homocoupling(df):
+def estimate_homocoupling(df, thr=0):
   """HC simple"""
+  assert thr >= 0
+
   df = df.T
   c = df.columns[0]
-  df = df[df[c]>0]
+  df = df[df[c]>thr]
   df = df.reset_index()
   df = df.rename(columns={"index": "polymer"})
+
   all_homocoupling = 0
   for prob, polymer in zip(df[c], df["polymer"]):
     polymer = polymer.split("+")
     a_count = int(polymer[0][:(len(polymer[0]) - 2)]) 
     b_count = int(polymer[1][:(len(polymer[1]) - 2)])
     all_homocoupling += prob * abs(b_count-a_count)
+
   return all_homocoupling
 
-def homocoupling_proportion(df):
+def homocoupling_proportion(df, thr=0):
   """HP - the sum of proportions for which |m-n| > 1."""
+  assert thr >= 0
+
   df = df.T
   c = df.columns[0]
-  df = df[df[c]>0]
+  df = df[df[c]>thr]
   df = df.reset_index()
   df = df.rename(columns={"index": "polymer"})
+
   hc_proportion = 0
   for prob, polymer in zip(df[c], df["polymer"]):
     polymer = polymer.split("+")
@@ -404,22 +463,24 @@ def homocoupling_proportion(df):
     b_count = int(polymer[1][:(len(polymer[1]) - 2)])
     if abs(b_count - a_count) > 1:
       hc_proportion += prob
+
   return hc_proportion
 
-def estimate_constrained_homocoupling(df, a_end_groups=None, b_end_groups=None, other_end_groups=None):
+def estimate_constrained_homocoupling(df, thr=0, a_end_groups=None, b_end_groups=None, other_end_groups=None):
   """HC constrained - estimates homocoupling level assuming that certain polymer endgroups determine which monomer is present at the end of the chain.
   _____
       Parameters:
   _____
       Returns:
   """
+  assert thr >= 0
   if not a_end_groups: a_end_groups = ["Br", "Methyl"] #BT end groups
   if not b_end_groups: b_end_groups = ["Stannyl"] #TT end groups
   if not other_end_groups: other_end_groups = ["H", "Phenyl", "Orthothyl"] #non determinating
 
   df = df.T
   c = df.columns.item()
-  df = df[df[c]>0]
+  df = df[df[c]>thr]
   df = df.reset_index()
   df = df.rename(columns={"index": "polymer"})
 
