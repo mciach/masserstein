@@ -160,6 +160,20 @@ class MCounter(Counter):
     """This is a slight extention of the ``Collections.Counter`` class
     to also allow multiplication with integers."""
 
+    def __add__(self, other):
+        '''Add counts from two MCounters.'''
+        if not isinstance(other, MCounter):
+            return NotImplemented
+        result = MCounter()
+        for elem, count in self.items():
+            newcount = count + other[elem]
+            if newcount > 0:
+                result[elem] = newcount
+        for elem, count in other.items():
+            if elem not in self and count > 0:
+                result[elem] = count
+        return result
+
     def __mul__(self, other):
       if not isinstance(other, int):
           raise TypeError("Non-int factor")
@@ -182,7 +196,7 @@ def get_possible_compounds(heavier_monomer:tuple[str, type[MCounter]],
   """
   _____
   Parameters:
-    heavier_monomer: tuple:(str, Counter Object)
+    heavier_monomer: tuple:(str, MCounter or Counter Object)
         list of reference spectra (masserstein.Spectrum objects)
     end_groups_costs: dict
         dictionary, where keys are end group configurations 
@@ -199,6 +213,8 @@ def get_possible_compounds(heavier_monomer:tuple[str, type[MCounter]],
   possible_compounds=[]
   A, a, = heavier_monomer 
   B, b = lighter_monomer
+  if not isinstance(a, MCounter) and isinstance(a, Counter): a = MCounter(a)
+  if not isinstance(b, MCounter) and isinstance(b, Counter): b = MCounter(b)
 
   def add_lighter_end_adduct(a_count, start):
     #core polymer
@@ -211,6 +227,7 @@ def get_possible_compounds(heavier_monomer:tuple[str, type[MCounter]],
             f = core + end_group1 + end_group2 + adduct
             if end_group_name1 == end_group_name2: label = f"{a_count}{A}+{b_count}{B}+2{end_group_name1}+{adduct_name}"
             else: label = f"{a_count}{A}+{b_count}{B}+{end_group_name1}+{end_group_name2}+{adduct_name}"
+            if not isinstance(f, MCounter) and isinstance(f, Counter): f = MCounter(f)
             s = Spectrum(formula=f.formula_from_counter(), label=label) #generating spectrum 
             if min_mz <= s.confs[0][0] <= max_mz: #whether theorethical spectrum is in interval of interest
               s.normalize()
@@ -222,6 +239,7 @@ def get_possible_compounds(heavier_monomer:tuple[str, type[MCounter]],
           f = core + end_group1 + end_group2
           if end_group_name1 == end_group_name2: label = f"{a_count}{A}+{b_count}{B}+2{end_group_name1}"
           else: label = f"{a_count}{A}+{b_count}{B}+{end_group_name1}+{end_group_name2}"
+          if not isinstance(f, MCounter) and isinstance(f, Counter): f = MCounter(f)
           s = Spectrum(formula=f.formula_from_counter(), label=label) #generating spectrum 
           if min_mz <= s.confs[0][0] <= max_mz: #whether theorethical spectrum is in interval of interest
             s.normalize()
