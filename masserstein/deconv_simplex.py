@@ -1095,7 +1095,7 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
             for i in conf_IDs:
                 #confs from very small chunks will be kept in a special list
                 #later this list will be attached to vortex
-                exp_confs_in_almost_empty_chunks.append(exp_confs[i])
+                exp_confs_in_almost_empty_chunks.append(experimental_confs[i])
         else:
             experimental_chunk = Spectrum('', empty=True)
             # Note: conf_IDs are monotonic w.r.t. conf mass,
