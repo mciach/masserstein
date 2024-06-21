@@ -174,7 +174,7 @@ class Spectrum:
         """
         Merges configurations with an identical mass, summing their intensities.
         """
-        if not self.empty:
+        if self.confs:
             cmass = self.confs[0][0]
             cprob = 0.0
             ret = []
@@ -193,6 +193,7 @@ class Spectrum:
     def set_confs(self, confs):
         self.confs = confs
         if len(self.confs) > 0:
+            self.empty = False
             self.sort_confs()
             self.merge_confs()
         else:
@@ -201,6 +202,7 @@ class Spectrum:
     def __add__(self, other):
         res = Spectrum()
         res.confs = self.confs + other.confs
+        if res.confs: res.empty = False
         res.sort_confs()
         res.merge_confs()
         res.label = self.label + ' + ' + other.label
@@ -210,6 +212,7 @@ class Spectrum:
         res = Spectrum()
         res.set_confs([(x[0], number*x[1]) for x in self.confs])
         res.label = self.label
+        res.empty = self.empty
         return res
 
     def __rmul__(self, number):
@@ -274,7 +277,7 @@ class Spectrum:
         for i in range(len(self.confs)):
             e += min(self.confs[i][1],other.confs[i][1])
         return e
-
+    
     def bin_to_nominal(self, nb_of_digits=0):
         """
         Rounds mass values to a given number of decimal digits.
@@ -285,8 +288,8 @@ class Spectrum:
         will correspond to nominal mass of peaks.
         """
         xcoord, ycoord = zip(*self.confs)
-        xcoord = map(lambda x: x*self.charge, xcoord)
-        xcoord = (xcoord[0] + round(x-xcoord[0], nb_of_digits) for x in xcoord)
+        xcoord = list(map(lambda x: x*self.charge, xcoord))
+        xcoord = [xcoord[0] + round(x-xcoord[0], nb_of_digits) for x in xcoord]
         xcoord = map(lambda x: x/self.charge, xcoord)
         self.confs = list(zip(xcoord, ycoord))
         self.sort_confs()
@@ -664,7 +667,7 @@ class Spectrum:
         merged_bounds = []
         c_low, c_up = bounds[0]
         for b in bounds:
-            if b[0] <= c:
+            if b[0] <= c_low:
                 pass # to be finished
 
 
