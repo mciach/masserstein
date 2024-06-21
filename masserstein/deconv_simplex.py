@@ -588,7 +588,7 @@ def dualdeconv4_with_costs(experimental_sp, theoretical_sps, costs, penalty, pen
         constraints = program.constraints
         probs = [round(constraints['p_%i' % i].pi, 12) for i in range(1, k+1)]
         p0_prime = round(constraints['p0_prime'].pi, 12)
-        exp_vec = list(intensity_generator(exp_confs, global_mass_axis))
+        # experimental_vec = list(intensity_generator(experimental_confs, global_mass_axis))
         abyss = [round(constraints['g_%i' % i].pi, 12) for i in range(1, n+1)]
 
         abyss_th = [round(constraints['g_prime_%i' % i].pi, 12) for i in range(1, n+1)]
@@ -982,7 +982,6 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
     if costs:
         assert len(costs)==len(query), 'len(costs) must be equal len(query)!'
     assert abs(sum(x[1] for x in experimental_confs) - 1.) < 1e-08, 'The experimental spectrum is not normalized.'
-    assert all(x[0] >= 0. for x in experimental_confs), 'Found experimental peaks with negative masses!'
     if any(x[1] < 0 for x in experimental_confs):
         raise ValueError("""
         The experimental spectrum cannot contain negative intensities. 
@@ -1058,6 +1057,7 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
     experimental_conf_chunks = []  # list of indices of experimental confs matching chunks
     current_chunk = 0
     matching_confs = []  # experimental confs matching current chunk
+    exp_confs_outside_chunks = [] 
     current_bound = chunk_bounds[current_chunk]
     for conf_id, current_conf in progr_bar(enumerate(experimental_confs), desc = "Splitting the experimental spectrum into chunks"):
         while current_bound[1] < current_conf[0] and current_chunk < len(chunk_bounds)-1:
@@ -1068,8 +1068,10 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
         if current_bound[0] <= current_conf[0] <= current_bound[1]:
             matching_confs.append(conf_id)
         else:
-            # experimental peaks outside chunks go straight to vortex
-            vortex[conf_id] = current_conf[1]
+            # those exp_confs that are outside all the chunks are kept in special list
+            # later they will be attached to the vortex
+            exp_confs_outside_chunks.append(current_conf)
+            
     experimental_conf_chunks.append(matching_confs)
     chunk_TICs = [sum(experimental_confs[i][1] for i in chunk_list) for chunk_list in experimental_conf_chunks]
     if verbose:
@@ -1078,8 +1080,10 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
     ############################################################################################
     # Deconvolving chunks:
     p0_prime = 0
+    vortex = []
     vortex_th = []
     global_mass_axis = []
+    exp_confs_in_almost_empty_chunks = []
     for current_chunk_ID, conf_IDs in progr_bar(enumerate(experimental_conf_chunks), desc="Deconvolving chunks", 
                                                                             total=len(experimental_conf_chunks)):
         if verbose:
@@ -1089,7 +1093,9 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
             if verbose:
                 print('Chunk %i is almost empty - skipping deconvolution' % current_chunk_ID)
             for i in conf_IDs:
-                vortex[i] = experimental_confs[i][1] 
+                #confs from very small chunks will be kept in a special list
+                #later this list will be attached to vortex
+                exp_confs_in_almost_empty_chunks.append(exp_confs[i])
         else:
             experimental_chunk = Spectrum('', empty=True)
             # Note: conf_IDs are monotonic w.r.t. conf mass,
@@ -1134,14 +1140,44 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
             for i, p in enumerate(dec['probs']):
                 original_thr_spectrum_ID = theoretical_spectra_IDs[i]
                 proportions[original_thr_spectrum_ID] = p*chunk_TICs[current_chunk_ID]
-            for i, p in enumerate(dec['trash']):
-                original_conf_id = conf_IDs[i]
-                vortex[original_conf_id] = p*chunk_TICs[current_chunk_ID]
+
+            rescaled_vortex = [element*chunk_TICs[current_chunk_ID] for element in dec['trash']]
+            vortex = vortex + rescaled_vortex
+            global_mass_axis = global_mass_axis + dec['global_mass_axis']
+            
             if MTD_th:
                 p0_prime += dec["noise_in_theoretical"]*chunk_TICs[current_chunk_ID]
                 rescaled_vortex_th = [element*chunk_TICs[current_chunk_ID] for element in dec['theoretical_trash']]
                 vortex_th += rescaled_vortex_th
-                global_mass_axis += dec['global_mass_axis']
+
+    assert len(global_mass_axis) == len(vortex)
+    if MTD_th is not None:
+        assert len(global_mass_axis) == len(vortex_th)
+
+    #confs from outside global mass_axis are gathered in one list
+    exp_confs_from_outside_cha = exp_confs_outside_chunks + exp_confs_in_almost_empty_chunks
+
+
+    #appending these confs to vortex
+    vortex = list(zip(global_mass_axis, vortex)) + exp_confs_from_outside_cha
+    vortex = sorted(vortex, key = lambda x: x[0])
+    global_mass_axis_v = [el[0] for el in vortex]
+    vortex = [el[1] for el in vortex]
+    if MTD_th is not None:
+        #since global mass_axis will be updated, we need to add new confs to vortex_th as well
+        #those elements will always have intensities equal to zero, because they are from outside chunks
+        vortex_th = list(zip(global_mass_axis, vortex_th)) + [(el[0], 0.) for el in exp_confs_from_outside_cha]
+        vortex_th = sorted(vortex_th, key = lambda x: x[0])
+        global_mass_axis_v_th = [el[0] for el in vortex_th]
+        vortex_th = [el[1] for el in vortex_th]
+        assert global_mass_axis_v == global_mass_axis_v_th
+    #finally, we update global_mass_axis
+    global_mass_axis = global_mass_axis_v
+
+    assert len(global_mass_axis) == len(vortex)
+    if MTD_th is not None:
+        assert len(global_mass_axis) == len(vortex_th)
+
 
     if not np.isclose(sum(proportions)+sum(vortex), 1., atol=len(vortex)*1e-03):
         warn("""In estimate_proportions:
@@ -1153,4 +1189,4 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
         return {'proportions': proportions, 'noise': vortex, 'noise_in_theoretical': vortex_th, 
                 'proportion_of_noise_in_theoretical': p0_prime, 'global_mass_axis': global_mass_axis}
     else:
-        return {'proportions': proportions, 'noise': vortex}
+        return {'proportions': proportions, 'noise': vortex, 'global_mass_axis': global_mass_axis} 
