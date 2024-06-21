@@ -461,7 +461,7 @@ def monomer_frequency(df, thr: float = 0, normalize=True):
 
   return a_freq, b_freq
 
-def estimate_homocoupling(df, thr: float = 0, normalize: bool = True):
+def estimate_homocoupling(df, thr: float = 0, normalize: bool = True): #remove
   """HC simple"""
   assert thr >= 0
 
@@ -482,7 +482,7 @@ def estimate_homocoupling(df, thr: float = 0, normalize: bool = True):
 
   return all_homocoupling
 
-def homocoupling_proportion(df, thr: float = 0, normalize: bool = True):
+def homocoupling_proportion(df, thr: float = 0, normalize: bool = True): #remove
   """HP - the sum of proportions for which |m-n| > 1."""
   assert thr >= 0
 
@@ -503,7 +503,7 @@ def homocoupling_proportion(df, thr: float = 0, normalize: bool = True):
 
   return hc_proportion
 
-def estimate_constrained_homocoupling(df, thr: float = 0, normalize: bool = True, 
+def estimate_constrained_homocoupling(df, thr: float = 0, normalize: bool = True, #remove
                                       a_end_groups: Optional[list[str]] = None, 
                                       b_end_groups: Optional[list[str]] = None, 
                                       other_end_groups: Optional[list[str]] = None):
