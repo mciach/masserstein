@@ -10,6 +10,7 @@ import numpy.random as rd
 from scipy.signal import argrelmax
 from .peptides import get_protein_formula
 from warnings import warn
+from copy import deepcopy
 
 class Spectrum:
     def __init__(self, formula='', threshold=0.001, total_prob=None,
@@ -142,6 +143,12 @@ class Spectrum:
         """
         norm = float(sum(x[1] for x in self.confs))
         return sum(x[0]*x[1]/norm for x in self.confs)
+
+    def copy(self):
+        """
+        Return a (deep) copy of self
+        """
+        return deepcopy(self)
 
     # def copy(self):
     #     isospec = self.isospec
