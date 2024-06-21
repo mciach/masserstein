@@ -23,10 +23,10 @@ This will install the latest stable release of the package.
 To get the development version, clone this repository. In the commandline, this can be done by typing:
 
 ```
-git clone https://github.com/mciach/wassersteinms.git
+git clone https://github.com/mciach/masserstein.git
 ```
 
-The above command will create a folder `wassersteinms` in your current working directory. The folder contains the setup file and some example data. Finally, install the package by running the `setup.py` file:
+The above command will create a folder `masserstein` in your current working directory. The folder contains the setup file and some example data. Finally, install the package by running the `setup.py` file:
 
 ```
 python3 setup.py install --user
