@@ -118,7 +118,7 @@ def main():
             assert 0 <= prob <= 1, 'Improper isotopic envelope coverage value: %f' % prob
         if opt == '-t':
             penalty = float(arg)
-            assert penalty == -1 or penalty >= 0, 'Improper maximum transport distance: %f' % thr
+            assert penalty == -1 or penalty >= 0, 'Improper maximum transport distance: %f' % penalty
         if opt == '-c':
             MDC = float(arg)
             assert MDC >= 0, 'Improper Minimum Detectable Current value: %f' % MDC
