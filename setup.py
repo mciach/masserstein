@@ -79,15 +79,15 @@ setup(
     #
     # This field corresponds to the "Home-Page" metadata field:
     # https://packaging.python.org/specifications/core-metadata/#home-page-optional
-    #url='https://github.com/pypa/sampleproject',  # Optional
+    url='https://github.com/mciach/masserstein',  # Optional
 
     # This should be your name or the name of the organization which owns the
     # project.
-    #author='The Python Packaging Authority',  # Optional
+    author='Gambin Lab',  # Optional
 
     # This should be a valid email address corresponding to the author listed
     # above.
-    #author_email='pypa-dev@googlegroups.com',  # Optional
+    author_email='michal.aleksander.ciach@gmail.com',  # Optional
 
     # Classifiers help users find your project by categorizing it.
     #
