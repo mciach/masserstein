@@ -524,8 +524,8 @@ class Spectrum:
             x = np.hstack((lx, mz[(p-left_shift+1):(p+right_shift)], rx))
             y = np.hstack((target_intsy, intsy[(p-left_shift+1):(p+right_shift)], target_intsy))
             # Integrate the area:
-            cint = np.trapz(y, x)
-            cmz = np.trapz(y*x, x)/cint
+            cint = np.trapezoid(y, x)
+            cmz = np.trapezoid(y*x, x)/cint
             if cmz not in centroid_mz:  # intensity errors may introduce artificial peaks
                 centroid_mz.append(cmz)
                 centroid_intensity.append(cint)
