@@ -1,4 +1,5 @@
 from .spectrum import *
 from .deconv_simplex import *
 
-__version__ = '2.0.0'
+import importlib.metadata
+__version__ = importlib.metadata.version("masserstein")
