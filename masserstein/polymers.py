@@ -37,7 +37,6 @@ def load_mzxml(path:str, huge_tree=False):
   nonzero = i > 0
   confs = list(zip(mz, i))
   s = Spectrum('', empty=True, label=os.path.split(path)[-1])
-  print(f"{s.label:16} loaded: {len(confs)} ({100*nonzero.mean():.2f}% non-zero) datapoints in {path}")
   s.set_confs(confs)
   return s
 
@@ -258,11 +257,10 @@ def get_possible_compounds(heavier_monomer:tuple[str, type[MCounter]],
     add_lighter_end_adduct(a_count, start)
 
   possible_compounds = sorted(possible_compounds, key=lambda s: s.confs[0][0])
-  if verbose==True:
+  if verbose:
     for s in possible_compounds:
       print(f"{s.label:25} {s.formula:30} {s.confs[0][0]}")
-
-  print(f"\n Found {len(possible_compounds)} expected spectra")
+    print(f"\n Found {len(possible_compounds)} expected spectra")
   return possible_compounds
 
 ############################################################################################################################################
