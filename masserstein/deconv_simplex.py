@@ -682,9 +682,8 @@ def estimate_proportions_old(spectrum, query, MTD=0.1, MDC=1e-8,
     # Get experimental spectrum confs    
     try:
         exp_confs = spectrum.confs
-    except:
-        print("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?")
-        raise
+    except Exception as e:
+        raise TypeError("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?") from e
     
     ##########################################################################################################
     # Checks and asserts
@@ -973,9 +972,8 @@ def estimate_proportions(spectrum, query, costs=None, MTD=0.1, MDC=1e-8,
     # Get experimental spectrum confs    
     try:
         experimental_confs = spectrum.confs
-    except:
-        print("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?")
-        raise
+    except Exception as e:
+        raise TypeError("Could not retrieve the confs list. Is the supplied spectrum an object of class Spectrum?") from e
     
     ##########################################################################################################
     # Checks and asserts

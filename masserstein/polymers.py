@@ -760,11 +760,7 @@ def plot_annotations_hc(proportions: list[float],
     all_different_hc_types.sort() # bt-hc, no-hc, tt-hc
     hc_types_coding = [all_different_hc_types.index(hc) for hc in hc_types] 
   else:
-    print(f"Unrecognized cmap: {cmap}. Available cmaps: twilight, coolwarm, tab20. Selecting default tab20.")
-    cmap == cm.get_cmap(cmap)
-    all_different_hc_types = list(set(hc_types))
-    all_different_hc_types.sort() # bt-hc, no-hc, tt-hc
-    hc_types_coding = [all_different_hc_types.index(hc) for hc in hc_types] 
+    raise ValueError(f"Unrecognized cmap: {cmap!r}. Available cmaps: twilight, coolwarm, tab20.")
 
   # Select the information about the polymers to show on the spectrum:
   is_over_threshold = [p > proportion_threshold for p in proportions]
