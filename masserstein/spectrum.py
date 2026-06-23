@@ -63,7 +63,6 @@ class Spectrum(BaseSpectrum):
         self.total_prob = total_prob
         self.charge = charge
         self.adduct = adduct
-        self.empty = False
 
         if label is None:
             self.label = formula
@@ -81,7 +80,6 @@ class Spectrum(BaseSpectrum):
                 self.confs_from_formula(
                     formula, threshold, total_prob, charge, adduct))
         else:
-            self.empty = True
             self.confs = []
 
     @staticmethod

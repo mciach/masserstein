@@ -35,10 +35,16 @@ class BaseSpectrum:
 
         if confs is not None:
             self.set_confs(confs)
-            self.empty = False
         else:
-            self.empty = True
             self.confs = []
+
+    @property
+    def empty(self):
+        """
+        True when the spectrum holds no peaks. Derived from .confs, so it is
+        always consistent with the current contents.
+        """
+        return not self.confs
 
 
     @classmethod
@@ -121,11 +127,8 @@ class BaseSpectrum:
         """
         self.confs = confs
         if len(self.confs) > 0:
-            self.empty = False
             self.sort_confs()
             self.merge_confs()
-        else:
-            self.empty = True
 
     def __add__(self, other):
         res = self.__class__()
