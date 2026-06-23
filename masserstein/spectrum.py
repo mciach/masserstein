@@ -56,10 +56,15 @@ class Spectrum(BaseSpectrum):
         """
         ### TODO2: seprarate subclasses for centroid & profile spectra
 
+        if formula != '' and confs is not None:
+            raise ValueError(
+                "Formula and confs cannot be set at the same time!")
+
+        # BaseSpectrum.__init__ stores confs (or leaves the spectrum empty).
         BaseSpectrum.__init__(self, confs=confs, label=label, **other)
 
         self.formula = formula
-        self.threshold = threshold 
+        self.threshold = threshold
         self.total_prob = total_prob
         self.charge = charge
         self.adduct = adduct
@@ -69,18 +74,10 @@ class Spectrum(BaseSpectrum):
         else:
             self.label = label
 
-
-        if formula != '' and confs is not None:
-            raise ValueError(
-                "Formula and confs cannot be set at the same time!")
-        elif confs is not None:
-            self.set_confs(confs)
-        elif formula != '':
+        if formula != '':
             self.set_confs(
                 self.confs_from_formula(
                     formula, threshold, total_prob, charge, adduct))
-        else:
-            self.confs = []
 
     @staticmethod
     def confs_from_formula(formula, threshold=0.001, total_prob=None,
