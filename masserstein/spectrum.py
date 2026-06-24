@@ -11,7 +11,7 @@ from scipy.signal import argrelmax
 from .peptides import get_protein_formula
 from warnings import warn
 from copy import deepcopy
-from .base_spectrum import *
+from .base_spectrum import BaseSpectrum
 
 
 class Spectrum(BaseSpectrum):
