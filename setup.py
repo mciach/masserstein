@@ -165,6 +165,10 @@ setup(
     # projects.
     extras_require={  # Optional
         'graphics': ['matplotlib'],
+        # Dependencies of masserstein.polymers, which is not imported by default.
+        # lxml is an undeclared transitive requirement of pyteomics.
+        'polymers': ['pandas', 'matplotlib', 'pyteomics', 'lxml'],
+        'test': ['pytest', 'pandas', 'matplotlib', 'pyteomics', 'lxml'],
     },
 
     # If there are data files included in your packages that need to be

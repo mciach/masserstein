@@ -1,1 +1,3 @@
 ./Tutorials/PBTTT_polymer_analysis/Data/
+.pytest_cache/
+__pycache__/

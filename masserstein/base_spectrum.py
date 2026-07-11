@@ -11,7 +11,7 @@ from copy import deepcopy
 
 class BaseSpectrum:
     
-    def __init__(self, confs=None, label=None, **other):
+    def __init__(self, confs=None, label="", **other):
         """Initialize a BaseSpectrum class.
 
         Initialization can be done by setting a peak list.
@@ -28,7 +28,8 @@ class BaseSpectrum:
             - the second element corresponds to the vertical axis (intensity).
 
         label: str
-            An optional spectrum label.
+            An optional spectrum label. Defaults to an empty string so that
+            labels of unlabelled spectra can still be concatenated on __add__.
 
         """
         self.label = label
