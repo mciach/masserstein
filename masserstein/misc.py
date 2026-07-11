@@ -1,4 +1,5 @@
 from bisect import bisect_left, bisect_right
+from math import inf
 
 
 def extract_range(L, range_min, range_max):
@@ -7,8 +8,11 @@ def extract_range(L, range_min, range_max):
 
     L *must* be sorted.
     '''
-    range_min = (range_min, 0.0)
-    range_max = (range_max, 0.0)
+    # The bounds carry a sentinel second coordinate so that tuple comparison is
+    # decided by the first one alone: an element at exactly range_min/range_max
+    # is included whatever its intensity.
+    range_min = (range_min, -inf)
+    range_max = (range_max, inf)
     left_idx = bisect_left(L, range_min)
     if left_idx == len(L):
         return

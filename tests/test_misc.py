@@ -9,18 +9,17 @@ def confs():
 
 
 class TestExtractRange:
+    def test_extracts_an_inclusive_range(self, confs):
+        assert list(extract_range(confs, 2.0, 3.0)) == [(2.0, 0.2), (3.0, 0.3)]
+
     def test_lower_bound_is_inclusive(self, confs):
         assert list(extract_range(confs, 2.0, 3.5)) == [(2.0, 0.2), (3.0, 0.3)]
 
-    def test_upper_bound_currently_excludes_an_exact_match(self, confs):
-        # BUG (pinned): the docstring promises range_min <= l[0] <= range_max, but
-        # the bound is built as the tuple (range_max, 0.0), which compares below any
-        # peak of positive intensity at that mass, so bisect_right drops it.
-        assert list(extract_range(confs, 2.0, 3.0)) == [(2.0, 0.2)]
-
-    @pytest.mark.xfail(strict=True, reason="upper bound is exclusive; see docstring")
-    def test_upper_bound_should_be_inclusive(self, confs):
-        assert list(extract_range(confs, 2.0, 3.0)) == [(2.0, 0.2), (3.0, 0.3)]
+    def test_bounds_are_inclusive_whatever_the_intensity(self, confs):
+        # The bounds must be decided by the mass alone. Intensities above, below
+        # and equal to zero at the boundary all have to be kept.
+        L = [(1.0, -0.5), (2.0, 0.0), (3.0, 0.3)]
+        assert list(extract_range(L, 1.0, 3.0)) == L
 
     def test_bounds_need_not_match_a_peak(self, confs):
         assert list(extract_range(confs, 1.5, 3.5)) == [(2.0, 0.2), (3.0, 0.3)]
@@ -37,9 +36,8 @@ class TestExtractRange:
     def test_empty_gap_inside_the_data(self, confs):
         assert list(extract_range(confs, 2.2, 2.8)) == []
 
-    def test_single_point_range_is_empty_for_a_positive_peak(self, confs):
-        # Follows from the exclusive upper bound documented above.
-        assert list(extract_range(confs, 3.0, 3.0)) == []
+    def test_single_point_range(self, confs):
+        assert list(extract_range(confs, 3.0, 3.0)) == [(3.0, 0.3)]
 
     def test_empty_list(self):
         assert list(extract_range([], 0.0, 1.0)) == []
